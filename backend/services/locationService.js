@@ -6,11 +6,11 @@ const getCountryAndCurrency = async (placeName) => {
         // Using Nominatim (OpenStreetMap)
         const geoResponse = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&addressdetails=1&limit=1`, {
             headers: { 
-                'User-Agent': 'AI-Travel-Planner-App',
-                'Accept': 'application/json',
-                'Connection': 'keep-alive'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://google.com'
             },
-            timeout: 10000
+            timeout: 15000
         });
 
         if (!geoResponse.data || geoResponse.data.length === 0) {
@@ -20,6 +20,10 @@ const getCountryAndCurrency = async (placeName) => {
         const address = geoResponse.data[0].address;
         const countryCode = address.country_code.toUpperCase();
         const countryName = address.country;
+        const resolvedName = geoResponse.data[0].display_name.split(',')[0];
+        
+        // Extract parent city/town for broader landmark search
+        const parentLocation = address.city || address.town || address.village || address.municipality || address.county || countryName;
 
         // 2. Get currency from country code
         // Using RestCountries API
@@ -37,6 +41,8 @@ const getCountryAndCurrency = async (placeName) => {
         return {
             countryCode,
             countryName,
+            resolvedName,
+            parentLocation,
             currencyCode,
             currencySymbol,
             isIndia: countryCode === 'IN'
@@ -60,7 +66,7 @@ const searchLocations = async (query) => {
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Referer': 'https://google.com'
             },
-            timeout: 15000
+            timeout: 25000
         });
         return response.data.map(item => ({
             display_name: item.display_name,
@@ -69,11 +75,12 @@ const searchLocations = async (query) => {
     } catch (error) {
         console.error('Search Error:', error.message);
         if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
-            console.log('Retrying with alternative strategy...');
+            console.log('Retrying with alternative strategy after delay...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
             try {
-                // Secondary check using a different UA or slightly different endpoint if needed
                 const retryResponse = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`, {
-                    headers: { 'User-Agent': 'TravelPlannerBot/1.0 (contact@example.com)' }
+                    headers: { 'User-Agent': 'TravelPlannerBot/1.1 (https://example.com/bot; bot@example.com)' },
+                    timeout: 25000
                 });
                 return retryResponse.data.map(item => ({
                     display_name: item.display_name,
@@ -89,33 +96,71 @@ const searchLocations = async (query) => {
 
 const getLandmarks = async (destination) => {
     try {
-        // Multi-category search for variety
-        const queries = [`attractions in ${destination}`, `museums in ${destination}`, `parks in ${destination}`];
-        const results = await Promise.all(queries.map(q => 
-            axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=8`, {
+        const categories = [
+            'tourist attraction', 'museum', 'monument', 'viewpoint', 
+            'castle', 'palace', 'church', 'temple', 'cathedral', 
+            'historic site', 'national park', 'beach', 'landmark'
+        ];
+        
+        const results = await Promise.all(categories.map(cat => 
+            axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cat + ' in ' + destination)}&format=json&limit=15&addressdetails=1`, {
                 headers: { 
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Accept-Language': 'en-US,en;q=0.9',
                 },
-                timeout: 15000
+                timeout: 30000
             }).catch(() => ({ data: [] }))
         ));
         
-        const allLandmarks = results.flatMap(r => r.data);
+        let allLandmarks = results.flatMap(r => r.data);
+        
+        if (allLandmarks.length < 15) {
+            const broaderResponse = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent('tourism in ' + destination)}&format=json&limit=40&addressdetails=1`, {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                timeout: 20000
+            }).catch(() => ({ data: [] }));
+            allLandmarks = [...allLandmarks, ...broaderResponse.data];
+        }
+
         if (allLandmarks.length === 0) return [];
         
-        // Remove duplicates and clean up names
+        const blacklist = [
+            'road', 'highway', 'street', 'station', 'stop', 'bus', 'train', 'metro', 'airport', 
+            'school', 'university', 'office', 'company', 'shop', 'mall', 'bank', 'fuel', 
+            'residential', 'apartment', 'hospital', 'atm', 'parking', 'garage',
+            'hotel', 'motel', 'hostel', 'resort', 'lodge', 'villas', 'guest house', 'bed & breakfast',
+            'restaurant', 'cafe', 'bar', 'pharmacy'
+        ];
+
         const seen = new Set();
         return allLandmarks
+            .sort((a, b) => (b.importance || 0) - (a.importance || 0))
             .filter(item => {
-                const name = item.display_name.split(',')[0];
-                if (seen.has(name)) return false;
-                seen.add(name);
-                return true;
+                const fullName = item.display_name.toLowerCase();
+                const firstName = item.display_name.split(',')[0];
+                const itemClass = item.class || '';
+                const itemType = item.type || '';
+                
+                if (seen.has(firstName)) return false;
+                if (firstName.length < 3) return false;
+
+                const isBlacklisted = blacklist.some(word => fullName.includes(word) || itemClass.includes(word) || itemType.includes(word));
+                
+                // Prioritize tourism, historic, and heritage classes
+                const isTouristClass = ['tourism', 'historic', 'heritage', 'amenity', 'leisure', 'natural'].includes(itemClass);
+                
+                if (!isBlacklisted && (item.importance > 0.4 || isTouristClass)) {
+                    seen.add(firstName);
+                    return true;
+                }
+                return false;
             })
             .map(item => ({
                 name: item.display_name.split(',')[0],
-                address: item.display_name
+                address: item.display_name,
+                type: item.type,
+                class: item.class,
+                importance: item.importance
             }));
     } catch (error) {
         console.error('Landmark Search Error:', error.message);

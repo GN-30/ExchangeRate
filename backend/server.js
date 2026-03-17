@@ -23,13 +23,12 @@ app.post('/api/calculate', async (req, res) => {
     const { destination, days, budgetINR, travelType } = req.body;
 
     try {
-        // Resolve location and landmarks in parallel
-        const [locationDetails, landmarks] = await Promise.all([
-            getCountryAndCurrency(destination),
-            getLandmarks(destination)
-        ]);
+        // 1. Resolve location details first to get the most accurate name
+        const locationDetails = await getCountryAndCurrency(destination);
+        const { currencyCode, isIndia, countryName, resolvedName, parentLocation } = locationDetails;
 
-        const { currencyCode, isIndia, countryName } = locationDetails;
+        // 2. Fetch landmarks using both specific and parent names to ensure density
+        const landmarks = await getLandmarks(`${resolvedName}, ${parentLocation}`);
 
         let rate = 1;
         let convertedBudget = budgetINR;
@@ -50,7 +49,7 @@ app.post('/api/calculate', async (req, res) => {
             activities: breakdown.activities / days
         };
 
-        const itinerary = generateItinerary(countryName || destination, days, travelType, dailyBreakdown, landmarks);
+        const itinerary = generateItinerary(resolvedName || destination, days, travelType, dailyBreakdown, landmarks);
 
         // Save to DB (Handle gracefully if DB is not setup)
         try {
@@ -60,14 +59,14 @@ app.post('/api/calculate', async (req, res) => {
                 [countryName, days, budgetINR, travelType, convertedBudget, currencyCode, rate, breakdown, suggestions]
             );
         } catch (dbErr) {
-            // Mute background DB errors for cleaner logs during local development
             if (dbErr.code !== 'ECONNREFUSED') {
                 console.error('DB Insert Error:', dbErr.message);
             }
         }
 
         res.json({
-            destination: countryName,
+            destination: resolvedName || destination,
+            country: countryName,
             originalInput: destination,
             days,
             budgetINR,

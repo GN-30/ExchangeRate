@@ -11,10 +11,12 @@ const TravelForm = ({ onSubmit, loading }) => {
   });
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState(null);
 
   const fetchSuggestions = useCallback(async (query) => {
-    if (query.length < 3) {
+    if (!query || query.length < 3) {
       setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
     try {
@@ -23,24 +25,24 @@ const TravelForm = ({ onSubmit, loading }) => {
       setShowSuggestions(true);
     } catch (err) {
       console.error('Failed to fetch suggestions');
+      setSuggestions([]);
     }
   }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (formData.destination && !showSuggestions) {
-         // This is a bit tricky to avoid loop, we only fetch if the change was from typing
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [formData.destination]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
     if (name === 'destination') {
+      // Clear previous timeout
+      if (searchTimeout) clearTimeout(searchTimeout);
+      
       if (value.length >= 3) {
-        fetchSuggestions(value);
+        // Set new timeout for debouncing (500ms)
+        const timeoutId = setTimeout(() => {
+          fetchSuggestions(value);
+        }, 500);
+        setSearchTimeout(timeoutId);
       } else {
         setSuggestions([]);
         setShowSuggestions(false);

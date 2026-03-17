@@ -101,7 +101,14 @@ const Dashboard = ({ data }) => {
         </div>
       </div>
 
-      <Itinerary itinerary={data.itinerary} currencySymbol={data.currencySymbol} />
+      <Itinerary 
+        itinerary={data.itinerary} 
+        currencySymbol={data.currencySymbol} 
+        destination={data.destination}
+        country={data.country}
+        dailyBudget={data.dailyBudget}
+        totalBudget={data.convertedBudget}
+      />
     </div>
   );
 };

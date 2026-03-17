@@ -51,10 +51,14 @@ const ITINERARY_TEMPLATES = {
 const generateItinerary = (destination, days, travelType, dailyAverage = null, landmarks = []) => {
     const itinerary = [];
     const activitiesPerDay = 3;
+    const totalActivitiesNeeded = days * activitiesPerDay;
+    
+    // If landmarks are sparse, we should cycle through them or use templates strategically
+    // to avoid "General Topic" blocks at the end.
+    let landmarkIndex = 0;
     
     for (let i = 1; i <= days; i++) {
         const dailyActivities = [];
-        const startIndex = (i - 1) * activitiesPerDay;
         
         let totalDailyActivitiesCost = 0;
         const jitter = 0.85 + (Math.random() * 0.3);
@@ -64,24 +68,26 @@ const generateItinerary = (destination, days, travelType, dailyAverage = null, l
         
         for (let j = 0; j < activitiesPerDay; j++) {
             const timeStr = j === 0 ? "Morning" : j === 1 ? "Afternoon" : "Evening";
-            let costFactor = 0.2; // Base factor (cheap/free)
-
+            let costFactor = 0.2;
             let activityText = "";
-            if (landmarks.length > startIndex + j) {
-                const landmark = landmarks[startIndex + j];
+
+            // Try to use a landmark if available, or if we need to fill the gap
+            if (landmarkIndex < landmarks.length) {
+                const landmark = landmarks[landmarkIndex];
                 activityText = `${timeStr}: Visit ${landmark.name}`;
+                landmarkIndex++;
                 
-                // Venue-specific pricing logic
                 const name = landmark.name.toLowerCase();
                 if (name.includes('museum') || name.includes('art') || name.includes('gallery')) costFactor = 0.6;
                 else if (name.includes('tower') || name.includes('palace') || name.includes('castle')) costFactor = 0.8;
                 else if (name.includes('park') || name.includes('garden') || name.includes('square')) costFactor = 0.1;
                 else if (name.includes('temple') || name.includes('church') || name.includes('cathedral')) costFactor = 0.2;
-                else if (j === 1) costFactor = 0.5; // Afternoon primary activity is usually paid
+                else if (j === 1) costFactor = 0.5;
             } else {
+                // Better template filling when we run out of landmarks
                 const template = (ITINERARY_TEMPLATES[travelType] || ITINERARY_TEMPLATES.budget)[j];
                 activityText = template.replace("local", destination).replace("Destination", destination);
-                if (j === 1) costFactor = 0.6; // Template primary activity
+                if (j === 1) costFactor = 0.6;
             }
 
             const cost = dailyAverage ? Math.round(dailyAverage.activities * costFactor * jitter) : 0;
