@@ -1,20 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Search } from 'lucide-react';
 
 const Trends = () => {
     const [data, setData] = useState([]);
-    const [currency, setCurrency] = useState('USD');
+    const [searchTerm, setSearchTerm] = useState('United States');
     const [loading, setLoading] = useState(false);
+    
+    // Autocomplete states
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [searchTimeout, setSearchTimeout] = useState(null);
 
-    useEffect(() => {
-        fetchTrends();
-    }, [currency]);
-
-    const fetchTrends = async () => {
+    const fetchTrends = async (query) => {
         setLoading(true);
         try {
-            const res = await axios.get(`http://localhost:5000/api/history/rates/${currency}`);
+            const res = await axios.get(`http://localhost:5000/api/history/rates/${encodeURIComponent(query)}`);
             setData(res.data);
         } catch (e) {
             console.error(e);
@@ -23,42 +25,106 @@ const Trends = () => {
         }
     };
 
+    useEffect(() => {
+        fetchTrends(searchTerm);
+    }, []);
+
+    const fetchSuggestions = useCallback(async (query) => {
+        if (!query || query.length < 3) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+        try {
+            const response = await axios.get(`http://localhost:5000/api/search?q=${encodeURIComponent(query)}`);
+            setSuggestions(response.data);
+            setShowSuggestions(true);
+        } catch (err) {
+            setSuggestions([]);
+        }
+    }, []);
+
+    const handleSearchChange = (e) => {
+        const value = e.target.value;
+        setSearchTerm(value);
+        
+        if (searchTimeout) clearTimeout(searchTimeout);
+        
+        if (value.length >= 3) {
+            const timeoutId = setTimeout(() => {
+                fetchSuggestions(value);
+            }, 500);
+            setSearchTimeout(timeoutId);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    };
+
+    const handleSelectSuggestion = (suggestion) => {
+        const query = suggestion.display_name;
+        setSearchTerm(query);
+        setSuggestions([]);
+        setShowSuggestions(false);
+        fetchTrends(query);
+    };
+
     return (
         <div className="fade-in glass-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h2 className="premium-gradient-text" style={{ fontSize: '2rem' }}>Exchange Rate Trends</h2>
-                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                    <select 
-                        value={currency} 
-                        onChange={e => setCurrency(e.target.value)} 
+                <div style={{ position: 'relative', display: 'flex', flex: 1, minWidth: '250px', maxWidth: '400px' }}>
+                    <Search size={20} style={{ position: 'absolute', left: '1.2rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input 
+                        type="text" 
+                        value={searchTerm} 
+                        onChange={handleSearchChange}
+                        onKeyDown={(e) => { if(e.key === 'Enter') { fetchTrends(searchTerm); setShowSuggestions(false); } }}
+                        placeholder="Search any country (e.g. Indonesia)"
                         style={{ 
-                            width: 'auto', 
-                            appearance: 'none', 
-                            padding: '0.75rem 3rem 0.75rem 1.5rem', 
-                            background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(236,72,153,0.2) 100%)',
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            borderRadius: '1rem',
-                            fontSize: '1.1rem',
-                            fontWeight: '600',
-                            color: '#fff',
-                            textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                            boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                            cursor: 'pointer',
-                            outline: 'none',
-                            backdropFilter: 'blur(10px)'
+                            width: '100%', 
+                            padding: '0.8rem 1rem 0.8rem 3.5rem',
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid var(--glass-border)',
+                            borderRadius: '2rem',
+                            color: 'white',
+                            fontSize: '1.05rem',
+                            boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
                         }}
-                    >
-                        <option value="USD" style={{ background: '#0f172a' }}>🇺🇸 USD</option>
-                        <option value="EUR" style={{ background: '#0f172a' }}>🇪🇺 EUR</option>
-                        <option value="GBP" style={{ background: '#0f172a' }}>🇬🇧 GBP</option>
-                        <option value="JPY" style={{ background: '#0f172a' }}>🇯🇵 JPY</option>
-                        <option value="AUD" style={{ background: '#0f172a' }}>🇦🇺 AUD</option>
-                    </select>
-                    <div style={{ position: 'absolute', right: '1.2rem', pointerEvents: 'none', color: '#fff' }}>
-                        <svg width="14" height="8" viewBox="0 0 14 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M1 1L7 7L13 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </div>
+                    />
+                    {showSuggestions && suggestions.length > 0 && (
+                        <ul style={{ 
+                            position: 'absolute', 
+                            top: '100%', left: 0, right: 0, 
+                            background: 'var(--bg-dark)', 
+                            border: '1px solid var(--glass-border)',
+                            borderRadius: '1rem',
+                            marginTop: '0.5rem',
+                            zIndex: 10,
+                            maxHeight: '250px',
+                            overflowY: 'auto',
+                            listStyle: 'none',
+                            padding: '0.5rem 0',
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                        }}>
+                            {suggestions.map((s, i) => (
+                                <li 
+                                    key={i} 
+                                    onClick={() => handleSelectSuggestion(s)}
+                                    style={{ 
+                                        padding: '0.8rem 1.5rem', cursor: 'pointer',
+                                        borderBottom: i === suggestions.length - 1 ? 'none' : '1px solid var(--glass-border)',
+                                        fontSize: '0.95rem', transition: 'background 0.2s',
+                                        color: '#cbd5e1'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                >
+                                    {s.display_name}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             </div>
 

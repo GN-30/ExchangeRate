@@ -215,9 +215,23 @@ app.post('/api/alerts', authMiddleware, async (req, res) => {
 });
 
 // Mock Historical Rates Endpoint (Realistic 30-day random walk)
-app.get('/api/history/rates/:currencyCode', async (req, res) => {
+app.get('/api/history/rates/:searchTerm', async (req, res) => {
     try {
-        const baseRate = await require('./services/exchangeRateService').getExchangeRate(req.params.currencyCode) || 1;
+        let currencyCode = req.params.searchTerm;
+        
+        // If the searchTerm is likely a country name (e.g., 'Indonesia') instead of 'IDR'
+        if (currencyCode.length > 3 || currencyCode !== currencyCode.toUpperCase()) {
+            try {
+                const { getCountryAndCurrency } = require('./services/locationService');
+                const details = await getCountryAndCurrency(currencyCode);
+                currencyCode = details.currencyCode;
+            } catch(e) {
+                // If resolving fails, keep the term or fallback
+                console.warn("Could not resolve location:", currencyCode);
+            }
+        }
+        
+        const baseRate = await require('./services/exchangeRateService').getExchangeRate(currencyCode) || 1;
         const data = [];
         let currentRate = baseRate;
         const volatility = 0.005; // 0.5% max daily fluctuation
@@ -232,7 +246,8 @@ app.get('/api/history/rates/:currencyCode', async (req, res) => {
             
             data.push({ 
                 date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), 
-                rate: parseFloat(currentRate.toFixed(4)) 
+                rate: parseFloat(currentRate.toFixed(4)),
+                currency: currencyCode
             });
         }
         res.json(data);
