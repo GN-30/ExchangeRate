@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS trips (
     exchange_rate DECIMAL NOT NULL,
     breakdown JSONB NOT NULL,
     suggestions JSONB NOT NULL,
+    itinerary JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

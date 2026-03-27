@@ -14,7 +14,8 @@ const Navigation = () => {
     };
 
     const navItems = [
-        { path: '/', label: 'Plan Trip', icon: <Compass size={18} /> },
+        { path: '/', label: 'Home', icon: <Compass size={18} /> },
+        { path: '/plan', label: 'Plan Trip', icon: <Compass size={18} /> },
         { path: '/expenses', label: 'Expenses', icon: <Wallet size={18} /> },
         { path: '/trends', label: 'Trends', icon: <TrendingUp size={18} /> },
         { path: '/alerts', label: 'Alerts', icon: <Bell size={18} /> }
@@ -58,9 +59,9 @@ const Navigation = () => {
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 {user ? (
                     <>
-                        <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <User size={18} /> {user.name}
-                        </span>
+                        <Link to="/profile" style={{ color: 'var(--text-main)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.4rem 1rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '2rem' }}>
+                            <User size={18} color="var(--primary)" /> {user.name}
+                        </Link>
                         <button onClick={handleLogout} style={{ background: 'transparent', border: '1px solid var(--glass-border)', padding: '0.5rem 1rem' }}>
                             <LogOut size={16} /> Logout
                         </button>

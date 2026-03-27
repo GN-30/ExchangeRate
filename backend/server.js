@@ -65,9 +65,9 @@ app.post('/api/calculate', async (req, res) => {
         // Save to DB (Handle gracefully if DB is not setup)
         try {
             await db.query(
-                `INSERT INTO trips (user_id, destination_country, days, budget_inr, travel_type, converted_budget, currency_code, exchange_rate, breakdown, suggestions) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                [userId, countryName, days, budgetINR, travelType, convertedBudget, currencyCode, rate, breakdown, suggestions]
+                `INSERT INTO trips (user_id, destination_country, days, budget_inr, travel_type, converted_budget, currency_code, exchange_rate, breakdown, suggestions, itinerary) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                [userId, countryName, days, budgetINR, travelType, convertedBudget, currencyCode, rate, JSON.stringify(breakdown), JSON.stringify(suggestions), JSON.stringify(itinerary)]
             );
         } catch (dbErr) {
             if (dbErr.code !== 'ECONNREFUSED') {
@@ -97,9 +97,9 @@ app.post('/api/calculate', async (req, res) => {
     }
 });
 
-app.get('/api/history', async (req, res) => {
+app.get('/api/history', authMiddleware, async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM trips ORDER BY created_at DESC LIMIT 10');
+        const result = await db.query('SELECT * FROM trips WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50', [req.user.id]);
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch history' });
