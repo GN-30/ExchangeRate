@@ -17,7 +17,9 @@ const Chatbot = () => {
         setInput('');
 
         try {
-            const res = await axios.post('http://localhost:5000/api/chat', { message: userMsg });
+            const token = localStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const res = await axios.post('http://localhost:5000/api/chat', { message: userMsg }, { headers });
             setMessages(prev => [...prev, { text: res.data.reply, isBot: true }]);
         } catch (err) {
             setMessages(prev => [...prev, { text: "Sorry, I'm having trouble connecting right now.", isBot: true }]);

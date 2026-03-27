@@ -140,8 +140,17 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 // Chatbot Route
 app.post('/api/chat', async (req, res) => {
     try {
+        let userId = null;
+        const token = req.header('Authorization')?.replace('Bearer ', '');
+        if (token) {
+            try {
+                const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'secret_key');
+                userId = decoded.id;
+            } catch (e) {}
+        }
+        
         const { message } = req.body;
-        const reply = await getChatbotResponse(message);
+        const reply = await getChatbotResponse(message, userId);
         res.json({ reply });
     } catch (err) {
         res.status(500).json({ error: 'Chatbot error' });
