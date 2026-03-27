@@ -1,5 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import axios from 'axios';
 import PlanTrip from './components/PlanTrip';
@@ -18,8 +19,22 @@ const API_BASE = 'http://localhost:5000/api';
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useContext(AuthContext);
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <div style={{ textAlign: 'center', marginTop: '4rem', color: 'var(--text-muted)' }}>Loading...</div>;
     return user ? children : <Navigate to="/login" />;
+};
+
+const PageTransition = ({ children }) => {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            style={{ width: '100%' }}
+        >
+            {children}
+        </motion.div>
+    );
 };
 
 function Home() {
@@ -66,23 +81,23 @@ function Home() {
 }
 
 function AppContent() {
+    const location = useLocation();
+
     return (
         <div className="container">
             <Navigation />
-            <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Signup />} />
-                <Route path="/" element={
-                    <ProtectedRoute>
-                        <Home />
-                    </ProtectedRoute>
-                } />
-                <Route path="/plan" element={<ProtectedRoute><PlanTrip /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/expenses" element={<ProtectedRoute><ExpenseTracker /></ProtectedRoute>} />
-                <Route path="/trends" element={<ProtectedRoute><Trends /></ProtectedRoute>} />
-                <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-            </Routes>
+            <AnimatePresence mode="wait">
+                <Routes location={location} key={location.pathname}>
+                    <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
+                    <Route path="/register" element={<PageTransition><Signup /></PageTransition>} />
+                    <Route path="/" element={<ProtectedRoute><PageTransition><Home /></PageTransition></ProtectedRoute>} />
+                    <Route path="/plan" element={<ProtectedRoute><PageTransition><PlanTrip /></PageTransition></ProtectedRoute>} />
+                    <Route path="/profile" element={<ProtectedRoute><PageTransition><Profile /></PageTransition></ProtectedRoute>} />
+                    <Route path="/expenses" element={<ProtectedRoute><PageTransition><ExpenseTracker /></PageTransition></ProtectedRoute>} />
+                    <Route path="/trends" element={<ProtectedRoute><PageTransition><Trends /></PageTransition></ProtectedRoute>} />
+                    <Route path="/alerts" element={<ProtectedRoute><PageTransition><Alerts /></PageTransition></ProtectedRoute>} />
+                </Routes>
+            </AnimatePresence>
             
             <Chatbot />
 

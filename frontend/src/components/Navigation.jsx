@@ -26,8 +26,9 @@ const Navigation = () => {
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center', 
-            padding: '1.5rem 0',
-            marginBottom: '2rem',
+            padding: '1rem 0',
+            marginTop: '-1rem',
+            marginBottom: '1.5rem',
             borderBottom: '1px solid var(--glass-border)'
         }}>
             <Link to="/" style={{ textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '800', fontSize: '1.5rem' }}>
