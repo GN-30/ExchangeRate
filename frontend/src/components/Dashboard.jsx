@@ -99,6 +99,26 @@ const Dashboard = ({ data }) => {
             ))}
           </ul>
         </div>
+        
+        <div className="glass-card">
+          <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Sparkles size={24} color="#ec4899" /> Smart Payment Advice
+          </h3>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '0.75rem' }}>
+              <strong>Cash (20%)</strong>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Keep {data.currencySymbol}{Math.round(data.convertedBudget * 0.2)} in local currency for street vendors, tips, and small purchases.</p>
+            </div>
+            <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '0.75rem' }}>
+              <strong>Forex Card (60%)</strong>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Load {data.currencySymbol}{Math.round(data.convertedBudget * 0.6)} for core expenses like hotels and shopping to avoid high conversion fees.</p>
+            </div>
+            <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '0.75rem' }}>
+              <strong>Credit Card (20%)</strong>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Keep {data.currencySymbol}{Math.round(data.convertedBudget * 0.2)} buffer on a zero-markup credit card for emergencies or deposits.</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <Itinerary 
