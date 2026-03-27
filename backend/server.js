@@ -63,12 +63,14 @@ app.post('/api/calculate', async (req, res) => {
         const itinerary = generateItinerary(resolvedName || destination, days, travelType, dailyBreakdown, landmarks);
 
         // Save to DB (Handle gracefully if DB is not setup)
+        let newTripId = null;
         try {
-            await db.query(
+            const tripRes = await db.query(
                 `INSERT INTO trips (user_id, destination_country, days, budget_inr, travel_type, converted_budget, currency_code, exchange_rate, breakdown, suggestions, itinerary) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
                 [userId, countryName, days, budgetINR, travelType, convertedBudget, currencyCode, rate, JSON.stringify(breakdown), JSON.stringify(suggestions), JSON.stringify(itinerary)]
             );
+            if (tripRes.rows.length > 0) newTripId = tripRes.rows[0].id;
         } catch (dbErr) {
             if (dbErr.code !== 'ECONNREFUSED') {
                 console.error('DB Insert Error:', dbErr.message);
@@ -76,6 +78,7 @@ app.post('/api/calculate', async (req, res) => {
         }
 
         res.json({
+            id: newTripId,
             destination: resolvedName || destination,
             country: countryName,
             originalInput: destination,
@@ -158,10 +161,15 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // Trips Routes
-app.get('/api/trips/latest', authMiddleware, async (req, res) => {
+app.get('/api/trips/:id', authMiddleware, async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM trips WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
-        if (result.rows.length === 0) return res.json(null);
+        if (req.params.id === 'latest') {
+            const result = await db.query('SELECT * FROM trips WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
+            if (result.rows.length === 0) return res.json(null);
+            return res.json(result.rows[0]);
+        }
+        const result = await db.query('SELECT * FROM trips WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Trip not found' });
         res.json(result.rows[0]);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch trip' });
@@ -171,7 +179,9 @@ app.get('/api/trips/latest', authMiddleware, async (req, res) => {
 // Expenses Routes
 app.get('/api/expenses', authMiddleware, async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM expenses WHERE user_id = $1 ORDER BY date DESC', [req.user.id]);
+        const tripId = req.query.tripId;
+        if (!tripId || tripId === 'null') return res.json([]);
+        const result = await db.query('SELECT * FROM expenses WHERE user_id = $1 AND trip_id = $2 ORDER BY date DESC', [req.user.id, tripId]);
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: 'Failed' });
@@ -180,10 +190,11 @@ app.get('/api/expenses', authMiddleware, async (req, res) => {
 
 app.post('/api/expenses', authMiddleware, async (req, res) => {
     try {
-        const { category, amount_inr, amount_local, description, date } = req.body;
+        const { trip_id, category, amount_inr, amount_local, description, date } = req.body;
+        if (!trip_id) return res.status(400).json({ error: 'trip_id is required' });
         const result = await db.query(
-            'INSERT INTO expenses (user_id, category, amount_inr, amount_local, description, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [req.user.id, category, amount_inr, amount_local, description, date]
+            'INSERT INTO expenses (trip_id, user_id, category, amount_inr, amount_local, description, date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [trip_id, req.user.id, category, amount_inr, amount_local, description, date]
         );
         res.json(result.rows[0]);
     } catch (err) {

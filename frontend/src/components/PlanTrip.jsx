@@ -29,6 +29,11 @@ const PlanTrip = () => {
         exchange_rate: response.data.rate,
         breakdown: response.data.breakdown
       };
+      
+      if (response.data.id) {
+          localStorage.setItem('active_trip_id', response.data.id);
+      }
+      
       localStorage.setItem('voyage_latest_trip', JSON.stringify(tripForStorage));
     } catch (err) {
       console.error(err);

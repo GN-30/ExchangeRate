@@ -13,31 +13,29 @@ const ExpenseTracker = () => {
     // Removed old mock planned data
 
     useEffect(() => {
-        fetchExpenses();
-        fetchLatestTrip();
+        // Ensure trip context is established before fetching specific expenses
+        fetchLatestTrip().then(() => fetchExpenses());
     }, []);
 
     const fetchLatestTrip = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/trips/latest', { headers: { Authorization: `Bearer ${token}` }});
+            const activeId = localStorage.getItem('active_trip_id') || 'latest';
+            const res = await axios.get(`http://localhost:5000/api/trips/${activeId}`, { headers: { Authorization: `Bearer ${token}` }});
             if (res.data) {
                 setLatestTrip(res.data);
-            } else {
-                const localTrip = localStorage.getItem('voyage_latest_trip');
-                if (localTrip) setLatestTrip(JSON.parse(localTrip));
+                localStorage.setItem('active_trip_id', res.data.id);
             }
         } catch (e) {
             console.error('Failed to fetch latest trip', e);
-            const localTrip = localStorage.getItem('voyage_latest_trip');
-            if (localTrip) setLatestTrip(JSON.parse(localTrip));
         }
     };
 
     const fetchExpenses = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/expenses', { headers: { Authorization: `Bearer ${token}` }});
+            const activeId = localStorage.getItem('active_trip_id');
+            const res = await axios.get(`http://localhost:5000/api/expenses?tripId=${activeId}`, { headers: { Authorization: `Bearer ${token}` }});
             setExpenses(res.data);
         } catch (e) {
             console.error(e);
@@ -48,7 +46,10 @@ const ExpenseTracker = () => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/expenses', formData, { headers: { Authorization: `Bearer ${token}` }});
+            const activeId = localStorage.getItem('active_trip_id');
+            if (!activeId) return;
+            
+            await axios.post('http://localhost:5000/api/expenses', { ...formData, trip_id: activeId }, { headers: { Authorization: `Bearer ${token}` }});
             fetchExpenses();
             setFormData({ ...formData, amount_inr: '', amount_local: '', description: '' });
         } catch (e) {

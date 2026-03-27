@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, MapPin, ChevronDown, ChevronUp, User, PlaneTakeoff, Navigation } from 'lucide-react';
+import { Calendar, MapPin, ChevronDown, ChevronUp, User, PlaneTakeoff, Navigation, ArrowRight } from 'lucide-react';
 import Itinerary from './Itinerary'; 
 
 const Profile = () => {
@@ -104,6 +104,20 @@ const Profile = () => {
                                             totalBudget={trip.converted_budget}
                                         />
                                     )}
+
+                                    <div style={{ marginTop: '2.5rem', display: 'flex', justifyContent: 'center' }}>
+                                        <button 
+                                            className="glow-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                localStorage.setItem('active_trip_id', trip.id);
+                                                window.location.href = '/expenses';
+                                            }}
+                                            style={{ padding: '1.25rem 2.5rem', borderRadius: '1rem', fontSize: '1.15rem' }}
+                                        >
+                                            Track Expenses for this Trip <ArrowRight size={20} />
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
