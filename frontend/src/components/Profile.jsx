@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, MapPin, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { Calendar, MapPin, ChevronDown, ChevronUp, User, PlaneTakeoff, Navigation } from 'lucide-react';
 import Itinerary from './Itinerary'; 
 
 const Profile = () => {
@@ -47,22 +47,27 @@ const Profile = () => {
             ) : (
                 <div style={{ display: 'grid', gap: '1.5rem' }}>
                     {history.map((trip) => (
-                        <div key={trip.id} className="glass-card" style={{ cursor: 'pointer', transition: 'transform 0.2s', padding: '1.5rem 2rem' }} onClick={() => toggleExpand(trip.id)}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div key={trip.id} className="glass-ticket" onClick={() => toggleExpand(trip.id)}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
-                                    <h3 style={{ fontSize: '1.8rem', color: '#f8fafc', marginBottom: '0.5rem' }}>
-                                        {trip.destination_country}
+                                    <p style={{ textTransform: 'uppercase', letterSpacing: '0.15em', fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '800', marginBottom: '0.5rem' }}>Trip ID: {trip.id.toString().padStart(4, '0')}</p>
+                                    <h3 style={{ fontSize: '2.5rem', color: '#f8fafc', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '800' }}>
+                                        <PlaneTakeoff color="var(--accent)" size={32} /> {trip.destination_country}
                                     </h3>
-                                    <div style={{ display: 'flex', gap: '1.5rem', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '2rem', border: '1px solid rgba(255,255,255,0.1)' }}>
                                             <Calendar size={16} /> {new Date(trip.created_at).toLocaleDateString()}
                                         </span>
-                                        <span>• {trip.days} Days</span>
-                                        <span>• Budget: ₹{Number(trip.budget_inr).toLocaleString()}</span>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '2rem', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            <Navigation size={16} /> {trip.days} Days
+                                        </span>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(52, 211, 153, 0.1)', padding: '0.5rem 1rem', borderRadius: '2rem', color: 'var(--accent)', border: '1px solid rgba(52, 211, 153, 0.2)', fontWeight: 'bold' }}>
+                                            ₹{Number(trip.budget_inr).toLocaleString()} Budget
+                                        </span>
                                     </div>
                                 </div>
-                                <div style={{ color: 'var(--primary)' }}>
-                                    {expandedId === trip.id ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
+                                <div style={{ color: 'var(--primary)', background: 'rgba(255,255,255,0.05)', padding: '0.75rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {expandedId === trip.id ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
                                 </div>
                             </div>
                             

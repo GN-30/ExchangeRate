@@ -63,12 +63,12 @@ const TravelForm = ({ onSubmit, loading }) => {
   };
 
   return (
-    <div className="glass-card fade-in">
-      <h2 className="premium-gradient-text" style={{ fontSize: '2rem', marginBottom: '2rem' }}>Plan Your Adventure</h2>
+    <div className="glass-ticket fade-in" style={{ cursor: 'default' }}>
+      <h2 className="premium-gradient-text" style={{ fontSize: '2.5rem', marginBottom: '2.5rem' }}>Plan Your Adventure</h2>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.5rem' }}>
         <div className="form-group" style={{ position: 'relative' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-            <MapPin size={18} /> Destination
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
+            <MapPin size={20} /> Destination Target
           </label>
           <div style={{ position: 'relative' }}>
             <input 
@@ -79,9 +79,9 @@ const TravelForm = ({ onSubmit, loading }) => {
               placeholder="e.g. Paris, Tokyo, Goa, London"
               autoComplete="off"
               required
-              style={{ paddingRight: '2.5rem' }}
+              style={{ width: '100%', height: '4rem', paddingRight: '2.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '1.1rem' }}
             />
-            <Search size={18} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <Search size={22} style={{ position: 'absolute', right: '1.25rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           </div>
 
           {showSuggestions && suggestions.length > 0 && (
@@ -122,35 +122,35 @@ const TravelForm = ({ onSubmit, loading }) => {
         </div>
 
         <div className="form-group">
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-            <Calendar size={18} /> Duration (Days)
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
+            <Calendar size={20} /> Duration (Days)
           </label>
-          <input type="number" name="days" value={formData.days} onChange={handleChange} min="1" />
+          <input type="number" name="days" value={formData.days} onChange={handleChange} min="1" style={{ width: '100%', height: '4rem', background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '1.1rem' }} />
         </div>
 
         <div className="form-group">
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-            <Wallet size={18} /> Budget (INR)
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
+            <Wallet size={20} /> Target Budget (INR)
           </label>
-          <input type="number" name="budgetINR" value={formData.budgetINR} onChange={handleChange} min="1000" />
+          <input type="number" name="budgetINR" value={formData.budgetINR} onChange={handleChange} min="1000" style={{ width: '100%', height: '4rem', background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '1.1rem' }} />
         </div>
 
         <div className="form-group">
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-            <Users size={18} /> Travel Style
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
+            <Users size={20} /> Travel Style
           </label>
-          <select name="travelType" value={formData.travelType} onChange={handleChange}>
-            <option value="budget">Budget</option>
-            <option value="luxury">Luxury</option>
-            <option value="family">Family</option>
-            <option value="solo">Solo</option>
+          <select name="travelType" value={formData.travelType} onChange={handleChange} style={{ width: '100%', height: '4rem', background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '1.1rem' }}>
+            <option value="budget" style={{ background: 'var(--bg-dark)' }}>Budget Constraints</option>
+            <option value="luxury" style={{ background: 'var(--bg-dark)' }}>Absolute Luxury</option>
+            <option value="family" style={{ background: 'var(--bg-dark)' }}>Family Friendly</option>
+            <option value="solo" style={{ background: 'var(--bg-dark)' }}>Solo Backpacker</option>
           </select>
         </div>
 
-        <button type="submit" disabled={loading || !formData.destination.trim()} style={{ marginTop: '1rem', height: '3.5rem' }}>
-          {loading ? 'Analyzing...' : (
+        <button className="glow-btn" type="submit" disabled={loading || !formData.destination.trim()} style={{ marginTop: '1.5rem', height: '4rem', fontSize: '1.2rem', borderRadius: '1rem' }}>
+          {loading ? 'Crunching AI Data...' : (
             <>
-              Plan Trip <Send size={20} />
+              Generate Itinerary <Send size={22} />
             </>
           )}
         </button>

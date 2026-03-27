@@ -118,8 +118,11 @@ function AppContent() {
     const location = useLocation();
 
     return (
-        <div className="container">
-            <Navigation />
+        <>
+            <div className="ambient-orb orb-1"></div>
+            <div className="ambient-orb orb-2"></div>
+            <div className="container" style={{ position: 'relative', zIndex: 1 }}>
+                <Navigation />
             <AnimatePresence mode="wait">
                 <Routes location={location} key={location.pathname}>
                     <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
@@ -139,6 +142,7 @@ function AppContent() {
               <p>© 2026 VoyageAI. Powered by Real-time Data & Intelligence.</p>
             </footer>
         </div>
+        </>
     );
 }
 
