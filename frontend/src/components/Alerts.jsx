@@ -12,7 +12,7 @@ const Alerts = () => {
 
     const fetchAlerts = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = sessionStorage.getItem('token');
             const res = await axios.get('http://localhost:5000/api/alerts', { headers: { Authorization: `Bearer ${token}` }});
             setAlerts(res.data);
         } catch (e) {
@@ -23,7 +23,7 @@ const Alerts = () => {
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
+            const token = sessionStorage.getItem('token');
             await axios.post('http://localhost:5000/api/alerts', formData, { headers: { Authorization: `Bearer ${token}` }});
             fetchAlerts();
             setFormData({ ...formData, target_rate: '' });
@@ -34,7 +34,7 @@ const Alerts = () => {
 
     const handleDelete = async (id) => {
         try {
-            const token = localStorage.getItem('token');
+            const token = sessionStorage.getItem('token');
             // Mock delete, usually would need a delete route.
             // await axios.delete(`http://localhost:5000/api/alerts/${id}`, { headers: { Authorization: `Bearer ${token}` }});
             setAlerts(alerts.filter(a => a.id !== id));

@@ -160,7 +160,9 @@ const getLandmarks = async (destination) => {
                 address: item.display_name,
                 type: item.type,
                 class: item.class,
-                importance: item.importance
+                importance: item.importance,
+                lat: item.lat,
+                lon: item.lon
             }));
     } catch (error) {
         console.error('Landmark Search Error:', error.message);

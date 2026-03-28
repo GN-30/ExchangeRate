@@ -23,12 +23,27 @@ const Signup = () => {
     };
 
     return (
-        <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass-card fade-in" 
-            style={{ maxWidth: '400px', margin: '4rem auto' }}
-        >
+        <div style={{
+    minHeight: '100vh',          // full screen height
+    width: '100%',              // full width (NOT 150vw)
+    position: 'relative',       // avoid overflow issues
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundImage: "url('/landing-bg.jpg')",
+    backgroundSize: 'cover',    // keeps it filling screen
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    padding: '2rem',
+    boxSizing: 'border-box',
+    borderRadius: '10px',
+}}>
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-card fade-in" 
+                style={{ width: '100%', maxWidth: '400px' }}
+            >
             <h2 className="premium-gradient-text" style={{ fontSize: '2rem', marginBottom: '2rem', textAlign: 'center' }}>Create Account</h2>
             {error && <div style={{ color: '#ef4444', marginBottom: '1rem', textAlign: 'center' }}>{error}</div>}
             <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.5rem' }}>
@@ -57,7 +72,8 @@ const Signup = () => {
             <p style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--text-muted)' }}>
                 Already have an account? <Link to="/login" style={{ color: 'var(--primary)' }}>Login</Link>
             </p>
-        </motion.div>
+            </motion.div>
+        </div>
     );
 };
 

@@ -15,7 +15,7 @@ const PlanTrip = () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await axios.post(`${API_BASE}/calculate`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -31,10 +31,10 @@ const PlanTrip = () => {
       };
       
       if (response.data.id) {
-          localStorage.setItem('active_trip_id', response.data.id);
+          sessionStorage.setItem('active_trip_id', response.data.id);
       }
       
-      localStorage.setItem('voyage_latest_trip', JSON.stringify(tripForStorage));
+      sessionStorage.setItem('voyage_latest_trip', JSON.stringify(tripForStorage));
     } catch (err) {
       console.error(err);
       setError('Failed to calculate budget. Please check if backend is running.');

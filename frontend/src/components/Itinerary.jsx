@@ -68,6 +68,49 @@ const Itinerary = ({ itinerary, dailyBudget, totalBudget, currencySymbol, destin
     return <Activity size={18} />;
   };
 
+  const handleViewWholeMap = () => {
+    const allLandmarks = itinerary.flatMap(day => day.activities).filter(a => a.landmark).map(a => a.landmark);
+    if (allLandmarks.length === 0) {
+        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`, '_blank');
+        return;
+    }
+    
+    // Google Maps dir URLs ideally max at ~10 waypoints plus origin/dest
+    const waypointsToSend = allLandmarks.slice(0, 10);
+    
+    if (waypointsToSend.length === 1) {
+        window.open(`https://www.google.com/maps/search/?api=1&query=${waypointsToSend[0].lat},${waypointsToSend[0].lon}`, '_blank');
+        return;
+    }
+
+    const origin = `${waypointsToSend[0].lat},${waypointsToSend[0].lon}`;
+    const dest = `${waypointsToSend[waypointsToSend.length - 1].lat},${waypointsToSend[waypointsToSend.length - 1].lon}`;
+    const waypoints = waypointsToSend.length > 2 ? waypointsToSend.slice(1, -1).map(l => `${l.lat},${l.lon}`).join('|') : '';
+    
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+    if (waypoints) url += `&waypoints=${waypoints}`;
+    
+    window.open(url, '_blank');
+  };
+
+  const handleViewDayMap = (day) => {
+    const dayLandmarks = day.activities.filter(a => a.landmark).map(a => a.landmark);
+    if(dayLandmarks.length === 0) return;
+    
+    if (dayLandmarks.length === 1) {
+        window.open(`https://www.google.com/maps/search/?api=1&query=${dayLandmarks[0].lat},${dayLandmarks[0].lon}`, '_blank');
+        return;
+    }
+
+    const origin = `${dayLandmarks[0].lat},${dayLandmarks[0].lon}`;
+    const dest = `${dayLandmarks[dayLandmarks.length - 1].lat},${dayLandmarks[dayLandmarks.length - 1].lon}`;
+    const waypoints = dayLandmarks.length > 2 ? dayLandmarks.slice(1, -1).map(l => `${l.lat},${l.lon}`).join('|') : '';
+    
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+    if (waypoints) url += `&waypoints=${waypoints}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="itinerary-root fade-in" style={{ marginTop: '2rem' }}>
       <style>{`
@@ -254,7 +297,33 @@ const Itinerary = ({ itinerary, dailyBudget, totalBudget, currencySymbol, destin
                   }}>
                     <Calendar size={14} /> DAY {day.day}
                   </div>
-                  <h3 style={{ fontSize: '1.75rem', margin: 0 }}>{day.title}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <h3 style={{ fontSize: '1.75rem', margin: 0 }}>{day.title}</h3>
+                    {day.activities.some(a => a.landmark) && (
+                        <button 
+                            onClick={() => handleViewDayMap(day)}
+                            title="Interactive Map Route for Today"
+                            style={{ 
+                                background: 'rgba(99, 102, 241, 0.15)', 
+                                border: '1px solid rgba(99, 102, 241, 0.4)', 
+                                borderRadius: '8px', 
+                                padding: '0.4rem 0.8rem', 
+                                color: 'var(--primary)', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '0.4rem', 
+                                fontSize: '0.8rem', 
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => Object.assign(e.target.style, { background: 'rgba(99, 102, 241, 0.3)', transform: 'translateY(-1px)'})}
+                            onMouseLeave={(e) => Object.assign(e.target.style, { background: 'rgba(99, 102, 241, 0.15)', transform: 'translateY(0)'})}
+                        >
+                            <MapPin size={14} style={{ pointerEvents: 'none' }} /> Route Map
+                        </button>
+                    )}
+                  </div>
                 </div>
                 {day.costs && (
                   <div style={{ textAlign: 'right' }}>
@@ -374,17 +443,28 @@ const Itinerary = ({ itinerary, dailyBudget, totalBudget, currencySymbol, destin
                    </p>
                 </div>
              </div>
-             <button style={{ 
-               width: '100%', 
-               marginTop: '1.5rem', 
-               background: 'rgba(255,255,255,0.1)', 
-               backdropFilter: 'blur(10px)',
-               border: '1px solid rgba(255,255,255,0.2)',
-               padding: '1rem',
-               borderRadius: '16px',
-               fontWeight: '700'
-             }}>
-               <Navigation size={18} /> Open in Maps
+             <button 
+               onClick={handleViewWholeMap}
+               style={{ 
+                 width: '100%', 
+                 marginTop: '1.5rem', 
+                 background: 'rgba(255,255,255,0.1)', 
+                 backdropFilter: 'blur(10px)',
+                 border: '1px solid rgba(255,255,255,0.2)',
+                 padding: '1rem',
+                 borderRadius: '16px',
+                 fontWeight: '700',
+                 cursor: 'pointer',
+                 display: 'flex',
+                 alignItems: 'center',
+                 justifyContent: 'center',
+                 gap: '0.5rem',
+                 transition: 'all 0.3s ease'
+               }}
+               onMouseEnter={(e) => Object.assign(e.target.style, { background: 'var(--primary)', borderColor: 'var(--primary)' })}
+               onMouseLeave={(e) => Object.assign(e.target.style, { background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)' })}
+             >
+               <Navigation size={18} style={{ pointerEvents: 'none' }} /> Open All Locations in Maps
              </button>
           </div>
         </div>

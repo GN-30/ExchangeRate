@@ -19,12 +19,12 @@ const ExpenseTracker = () => {
 
     const fetchLatestTrip = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const activeId = localStorage.getItem('active_trip_id') || 'latest';
+            const token = sessionStorage.getItem('token');
+            const activeId = sessionStorage.getItem('active_trip_id') || 'latest';
             const res = await axios.get(`http://localhost:5000/api/trips/${activeId}`, { headers: { Authorization: `Bearer ${token}` }});
             if (res.data) {
                 setLatestTrip(res.data);
-                localStorage.setItem('active_trip_id', res.data.id);
+                sessionStorage.setItem('active_trip_id', res.data.id);
             }
         } catch (e) {
             console.error('Failed to fetch latest trip', e);
@@ -33,8 +33,8 @@ const ExpenseTracker = () => {
 
     const fetchExpenses = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const activeId = localStorage.getItem('active_trip_id');
+            const token = sessionStorage.getItem('token');
+            const activeId = sessionStorage.getItem('active_trip_id');
             const res = await axios.get(`http://localhost:5000/api/expenses?tripId=${activeId}`, { headers: { Authorization: `Bearer ${token}` }});
             setExpenses(res.data);
         } catch (e) {
@@ -45,8 +45,8 @@ const ExpenseTracker = () => {
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            const activeId = localStorage.getItem('active_trip_id');
+            const token = sessionStorage.getItem('token');
+            const activeId = sessionStorage.getItem('active_trip_id');
             if (!activeId) return;
             
             await axios.post('http://localhost:5000/api/expenses', { ...formData, trip_id: activeId }, { headers: { Authorization: `Bearer ${token}` }});
@@ -59,7 +59,7 @@ const ExpenseTracker = () => {
 
     const handleDelete = async (id) => {
         try {
-            const token = localStorage.getItem('token');
+            const token = sessionStorage.getItem('token');
             await axios.delete(`http://localhost:5000/api/expenses/${id}`, { headers: { Authorization: `Bearer ${token}` }});
             fetchExpenses();
         } catch (e) {

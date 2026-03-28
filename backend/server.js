@@ -51,7 +51,7 @@ app.post('/api/calculate', async (req, res) => {
             displayCurrency = currencyCode;
         }
         
-        const { breakdown, suggestions } = estimateBudget(convertedBudget, travelType, countryName);
+        const { breakdown, suggestions } = await estimateBudget(convertedBudget, travelType, countryName);
         
         const dailyBreakdown = {
             food: breakdown.food / days,
@@ -60,7 +60,7 @@ app.post('/api/calculate', async (req, res) => {
             activities: breakdown.activities / days
         };
 
-        const itinerary = generateItinerary(resolvedName || destination, days, travelType, dailyBreakdown, landmarks);
+        const itinerary = await generateItinerary(resolvedName || destination, days, travelType, dailyBreakdown, landmarks);
 
         // Save to DB (Handle gracefully if DB is not setup)
         let newTripId = null;

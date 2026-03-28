@@ -11,7 +11,7 @@ const Profile = () => {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const token = localStorage.getItem('token');
+                const token = sessionStorage.getItem('token');
                 if (!token) return;
                 const res = await axios.get('http://localhost:5000/api/history', {
                     headers: { Authorization: `Bearer ${token}` }
@@ -110,7 +110,7 @@ const Profile = () => {
                                             className="glow-btn"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                localStorage.setItem('active_trip_id', trip.id);
+                                                sessionStorage.setItem('active_trip_id', trip.id);
                                                 window.location.href = '/expenses';
                                             }}
                                             style={{ padding: '1.25rem 2.5rem', borderRadius: '1rem', fontSize: '1.15rem' }}

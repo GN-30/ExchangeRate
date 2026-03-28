@@ -48,13 +48,21 @@ const ITINERARY_TEMPLATES = {
     ]
 };
 
-const generateItinerary = (destination, days, travelType, dailyAverage = null, landmarks = []) => {
+const { generateItineraryWithGemini } = require('./geminiService');
+
+const generateItinerary = async (destination, days, travelType, dailyAverage = null, landmarks = []) => {
+    // Try Gemini first for "Specific and Accurate" results
+    const geminiItinerary = await generateItineraryWithGemini(destination, days, travelType, dailyAverage);
+    if (geminiItinerary) {
+        console.log("Successfully generated specific itinerary using Gemini.");
+        return geminiItinerary;
+    }
+
+    // Fallback to Rule-based logic
+    console.log("Using rule-based fallback for itinerary.");
     const itinerary = [];
     const activitiesPerDay = 3;
-    const totalActivitiesNeeded = days * activitiesPerDay;
     
-    // If landmarks are sparse, we should cycle through them or use templates strategically
-    // to avoid "General Topic" blocks at the end.
     let landmarkIndex = 0;
     
     for (let i = 1; i <= days; i++) {
@@ -71,10 +79,12 @@ const generateItinerary = (destination, days, travelType, dailyAverage = null, l
             let costFactor = 0.2;
             let activityText = "";
 
-            // Try to use a landmark if available, or if we need to fill the gap
+            let landmarkData = null;
+
             if (landmarkIndex < landmarks.length) {
                 const landmark = landmarks[landmarkIndex];
                 activityText = `${timeStr}: Visit ${landmark.name}`;
+                landmarkData = landmark;
                 landmarkIndex++;
                 
                 const name = landmark.name.toLowerCase();
@@ -84,7 +94,6 @@ const generateItinerary = (destination, days, travelType, dailyAverage = null, l
                 else if (name.includes('temple') || name.includes('church') || name.includes('cathedral')) costFactor = 0.2;
                 else if (j === 1) costFactor = 0.5;
             } else {
-                // Better template filling when we run out of landmarks
                 const template = (ITINERARY_TEMPLATES[travelType] || ITINERARY_TEMPLATES.budget)[j];
                 activityText = template.replace("local", destination).replace("Destination", destination);
                 if (j === 1) costFactor = 0.6;
@@ -95,7 +104,8 @@ const generateItinerary = (destination, days, travelType, dailyAverage = null, l
 
             dailyActivities.push({
                 text: activityText,
-                cost: cost
+                cost: cost,
+                landmark: landmarkData
             });
         }
 
@@ -114,7 +124,7 @@ const generateItinerary = (destination, days, travelType, dailyAverage = null, l
     return itinerary;
 };
 
-const estimateBudget = (totalBudget, travelType, countryName = '') => {
+const estimateBudget = async (totalBudget, travelType, countryName = '') => {
     let ratios = { ...(ESTIMATION_LOGIC[travelType] || ESTIMATION_LOGIC.budget) };
 
     if (countryName.toLowerCase().includes('india')) {
@@ -137,8 +147,6 @@ const estimateBudget = (totalBudget, travelType, countryName = '') => {
     if (countryName.toLowerCase().includes('india')) {
         tripSuggestions.unshift("Download UPI apps or carry small cash for local vendors in India.");
     }
-
-    const itinerary = generateItinerary(countryName || 'Destination', Math.ceil(totalBudget > 0 ? 5 : 1), travelType); // Defaulting to 5 days for budget split context, but will use 'days' from req
 
     return { breakdown, suggestions: tripSuggestions };
 };
