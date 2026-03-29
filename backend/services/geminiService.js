@@ -1,25 +1,28 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const axios = require('axios');
 require('dotenv').config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+console.log("Gemini Service (Axios) Loaded. Key Present:", !!process.env.GEMINI_API_KEY);
 
 const generateItineraryWithGemini = async (destination, days, travelType, dailyAverage) => {
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_key_here') {
-        console.warn("Gemini API Key missing. Falling back to rule-based itinerary.");
+    const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+    if (!apiKey || apiKey === 'your_key_here') {
+        console.warn("Gemini API Key missing or placeholder. Falling back.");
         return null;
     }
 
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    console.log(`Generating itinerary for ${destination} (${days} days, ${travelType})...`);
 
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        
         const prompt = `
             Act as a professional travel planner. Generate a highly specific, accurate, and realistic day-wise travel itinerary for a ${days}-day ${travelType} trip to ${destination}.
             
             The traveler has a daily budget approximately as follows (in local currency or INR as appropriate):
-            - Food: ${dailyAverage.food}
-            - Stay: ${dailyAverage.stay}
-            - Transport: ${dailyAverage.transport}
-            - Activities: ${dailyAverage.activities}
+            - Food: ${dailyAverage ? dailyAverage.food : 'Standard'}
+            - Stay: ${dailyAverage ? dailyAverage.stay : 'Standard'}
+            - Transport: ${dailyAverage ? dailyAverage.transport : 'Standard'}
+            - Activities: ${dailyAverage ? dailyAverage.activities : 'Standard'}
 
             For EACH day, provide exactly 3 main activities (Morning, Afternoon, Evening).
             Be specific: Mention actual names of landmarks, restaurants, neighborhoods, or hidden gems.
@@ -49,19 +52,44 @@ const generateItineraryWithGemini = async (destination, days, travelType, dailyA
             - Make sure the landmarks are actually in or near ${destination}.
         `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        console.log("Sending request to Gemini via Axios...");
+        const response = await axios.post(url, {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 2048
+            }
+        }, {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 60000 // 60 seconds
+        });
+
+        const text = response.data.candidates[0].content.parts[0].text;
+        console.log("Raw Gemini Response received. Length:", text.length);
         
-        // Clean the response in case Gemini adds markdown code blocks
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
+        let parsedData = null;
+        try {
+            parsedData = JSON.parse(text);
+        } catch (e) {
+            console.log("JSON Parse failed, attempting cleanup...");
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                parsedData = JSON.parse(jsonMatch[0]);
+            } else {
+                throw e;
+            }
         }
         
-        return JSON.parse(text);
+        console.log("Successfully parsed JSON. Days count:", parsedData.length);
+        return parsedData;
     } catch (error) {
-        console.error("Gemini Generation Error:", error.message);
+        console.error("Gemini Axios Error:", error.message);
+        if (error.response) {
+            console.error("Error Status:", error.response.status);
+            console.error("Error Data:", JSON.stringify(error.response.data, null, 2));
+        }
         return null;
     }
 };

@@ -49,6 +49,7 @@ const ITINERARY_TEMPLATES = {
 };
 
 const { generateItineraryWithGemini } = require('./geminiService');
+console.log("AI Estimation Service Loaded.");
 
 const generateItinerary = async (destination, days, travelType, dailyAverage = null, landmarks = []) => {
     // Try Gemini first for "Specific and Accurate" results

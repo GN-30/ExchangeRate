@@ -60,7 +60,9 @@ app.post('/api/calculate', async (req, res) => {
             activities: breakdown.activities / days
         };
 
+        console.log(`Calculating itinerary for ${destination}...`);
         const itinerary = await generateItinerary(resolvedName || destination, days, travelType, dailyBreakdown, landmarks);
+        console.log("Itinerary generation complete.");
 
         // Save to DB (Handle gracefully if DB is not setup)
         let newTripId = null;
