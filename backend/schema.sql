@@ -43,5 +43,6 @@ CREATE TABLE IF NOT EXISTS alerts (
     target_rate DECIMAL NOT NULL,
     condition TEXT NOT NULL, -- 'above' or 'below'
     is_active BOOLEAN DEFAULT TRUE,
+    last_triggered_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

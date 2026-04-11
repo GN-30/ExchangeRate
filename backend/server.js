@@ -7,6 +7,7 @@ const db = require('./db');
 const { register, login } = require('./services/authService');
 const { getChatbotResponse } = require('./services/chatService');
 const authMiddleware = require('./middleware/auth');
+const { startAlertWorker } = require('./services/alertWorker');
 require('dotenv').config();
 
 const app = express();
@@ -236,6 +237,22 @@ app.post('/api/alerts', authMiddleware, async (req, res) => {
     }
 });
 
+// Test Email Route
+app.post('/api/auth/test-email', authMiddleware, async (req, res) => {
+    try {
+        const { sendAlertEmail } = require('./services/emailService');
+        await sendAlertEmail(req.user.email, req.user.name || 'User', {
+            currency: 'TEST',
+            targetRate: '1.0',
+            currentRate: '1.0',
+            condition: 'equal'
+        });
+        res.json({ message: `Test email sent to ${req.user.email}` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Mock Historical Rates Endpoint (Realistic 30-day random walk)
 app.get('/api/history/rates/:searchTerm', async (req, res) => {
     try {
@@ -262,7 +279,6 @@ app.get('/api/history/rates/:searchTerm', async (req, res) => {
             // Random walk: previous rate * (1 +/- volatility)
             const change = 1 + (Math.random() * (volatility * 2) - volatility);
             currentRate = currentRate * change;
-            
             const date = new Date();
             date.setDate(date.getDate() - i);
             
@@ -280,4 +296,5 @@ app.get('/api/history/rates/:searchTerm', async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    startAlertWorker();
 });
