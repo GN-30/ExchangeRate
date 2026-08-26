@@ -26,14 +26,13 @@ const Navigation = () => {
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center', 
-            padding: '1rem 0',
-            marginTop: '-1rem',
-            marginBottom: '1.5rem',
+            padding: '1.2rem 0',
+            marginBottom: '2rem',
             borderBottom: '1px solid var(--glass-border)'
         }}>
-            <Link to="/" style={{ textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '800', fontSize: '1.5rem' }}>
-                <Compass color="var(--primary)" size={28} />
-                <span>VoyageAI</span>
+            <Link to="/" style={{ textDecoration: 'none', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: '800', fontSize: '1.5rem', letterSpacing: '-0.02em' }}>
+                <Compass color="var(--primary)" size={30} />
+                <span className="premium-gradient-text">VoyageAI</span>
             </Link>
 
             {user && (
@@ -45,10 +44,12 @@ const Navigation = () => {
                             style={{ 
                                 textDecoration: 'none', 
                                 color: location.pathname === item.path ? 'var(--primary)' : 'var(--text-muted)',
+                                fontWeight: location.pathname === item.path ? '700' : '500',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.5rem',
-                                transition: 'color 0.2s'
+                                transition: 'color 0.2s ease',
+                                fontSize: '1.02rem'
                             }}
                         >
                             {item.icon} {item.label}
@@ -60,23 +61,22 @@ const Navigation = () => {
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 {user ? (
                     <>
-                        <Link to="/profile" style={{ color: 'var(--text-main)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.4rem 1rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '2rem' }}>
+                        <Link to="/profile" style={{ color: 'var(--text-main)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card)', padding: '0.5rem 1.1rem', border: '1px solid var(--glass-border)', borderRadius: '2rem', fontSize: '0.95rem', fontWeight: '600', boxShadow: '0 4px 15px var(--shadow-glow)' }}>
                             <User size={18} color="var(--primary)" /> {user.name}
                         </Link>
-                        <button onClick={handleLogout} style={{ background: 'transparent', border: '1px solid var(--glass-border)', padding: '0.5rem 1rem' }}>
-                            <LogOut size={16} /> Logout
+                        <button onClick={handleLogout} style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '0.5rem 1.1rem', borderRadius: '0.75rem', fontSize: '0.95rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <LogOut size={16} color="var(--primary)" /> Logout
                         </button>
                     </>
                 ) : (
                     <>
-                        <Link to="/login" style={{ textDecoration: 'none', color: 'white' }}>Login</Link>
-                        <Link to="/register" style={{ 
-                            background: 'var(--primary)', 
-                            color: 'white', 
-                            padding: '0.5rem 1.25rem', 
-                            borderRadius: '0.5rem', 
+                        <Link to="/login" style={{ textDecoration: 'none', color: 'var(--text-main)', fontWeight: '600', padding: '0.5rem 1rem' }}>Login</Link>
+                        <Link to="/register" className="glow-btn" style={{ 
+                            padding: '0.6rem 1.4rem', 
+                            borderRadius: '0.75rem', 
                             textDecoration: 'none',
-                            fontWeight: '600'
+                            fontWeight: '700',
+                            fontSize: '0.95rem'
                         }}>Sign Up</Link>
                     </>
                 )}

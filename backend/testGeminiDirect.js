@@ -1,7 +1,10 @@
+require('dotenv').config();
+
 const testFetchGemini = async () => {
     try {
         console.log("Testing fetch to Gemini API...");
-        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash?key=AIzaSyCQB8GzGqKCfw5Nrc3Nt8bSyyq-YqvNHyg");
+        const apiKey = process.env.GEMINI_API_KEY || "";
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash?key=${apiKey}`);
         console.log("Status:", res.status);
         const data = await res.json();
         console.log("Data:", JSON.stringify(data, null, 2));

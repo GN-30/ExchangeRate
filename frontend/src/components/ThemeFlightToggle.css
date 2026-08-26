@@ -1,0 +1,244 @@
+.tft-root {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+/* ============================================================
+   BUTTON STYLES
+   ============================================================ */
+.tft-plane-btn {
+    position: fixed;
+    left: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 75px;
+    height: 75px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
+    border: 2.5px solid rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+    background: var(--btn-gradient);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 12px 40px var(--shadow-glow), 0 0 25px rgba(255, 255, 255, 0.25);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: planeBob 4s ease-in-out infinite;
+    z-index: 9999;
+}
+
+.tft-light .tft-plane-btn {
+    left: auto;
+    right: 24px;
+}
+
+.tft-plane-btn:hover {
+    transform: translateY(-50%) scale(1.15);
+    box-shadow: 0 15px 45px var(--shadow-glow-hover);
+    animation-play-state: paused;
+}
+
+.tft-btn-plane-icon {
+    color: #ffffff !important;
+    stroke: #ffffff !important;
+    fill: none !important;
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.4));
+    transition: transform 0.3s ease;
+}
+
+.tft-light .tft-btn-plane-icon {
+    transform: scaleX(-1);
+}
+
+/* ============================================================
+   WAVY FLAG BANNER (POSITIONED BELOW THE PLANE ICON)
+   ============================================================ */
+.tft-bubble,
+.tft-flag-banner {
+    position: absolute;
+    top: calc(100% + 12px);
+    left: 50%;
+    transform-origin: top center;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #ffffff;
+    background: var(--btn-gradient);
+    border: 1.5px solid rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 25px var(--shadow-glow), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10000;
+    animation: flagWave 2.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
+}
+
+.tft-light .tft-bubble,
+.tft-light .tft-flag-banner {
+    top: calc(100% + 12px);
+    left: 50%;
+    right: auto;
+}
+
+/* Waving text animation */
+.tft-wave-text {
+    display: inline-block;
+    color: #ffffff;
+    font-weight: 800;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    animation: textWave 2.8s ease-in-out infinite alternate;
+}
+
+/* WAVY FLAG KEYFRAMES (FLUTTERING IN THE BREEZE) */
+@keyframes flagWave {
+    0% {
+        transform: translateX(-50%) rotate(-4deg) skewY(-3deg) scale(0.97);
+        box-shadow: -5px 8px 20px var(--shadow-glow);
+    }
+    33% {
+        transform: translateX(-50%) rotate(2deg) skewY(2deg) scale(1.02);
+        box-shadow: 2px 12px 25px var(--shadow-glow-hover);
+    }
+    66% {
+        transform: translateX(-50%) rotate(-2deg) skewY(-2deg) scale(0.99);
+        box-shadow: -3px 10px 22px var(--shadow-glow);
+    }
+    100% {
+        transform: translateX(-50%) rotate(4deg) skewY(3deg) scale(1.03);
+        box-shadow: 5px 14px 28px var(--shadow-glow-hover);
+    }
+}
+
+@keyframes textWave {
+    0% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    50% {
+        transform: translateY(-2px) rotate(1.5deg);
+    }
+    100% {
+        transform: translateY(1.5px) rotate(-1.5deg);
+    }
+}
+
+@keyframes planeBob {
+
+    0%,
+    100% {
+        transform: translateY(-50%);
+    }
+
+    50% {
+        transform: translateY(calc(-50% - 10px));
+    }
+}
+
+/* ============================================================
+   THE MISSING FLIGHT ANIMATION OVERLAY
+   ============================================================ */
+.tft-flight-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10000;
+}
+
+.tft-flying-plane {
+    position: absolute;
+    top: 50%;
+    left: -100px;
+    color: var(--primary);
+    filter: drop-shadow(0 0 20px var(--primary));
+    animation: flyAcross 2.6s cubic-bezier(0.45, 0, 0.15, 1) forwards;
+}
+
+.tft-trail {
+    position: absolute;
+    top: 50%;
+    left: -100px;
+    height: 4px;
+    width: 200px;
+    background: linear-gradient(90deg, transparent, var(--primary));
+    filter: blur(2px);
+    animation: trailAcross 2.6s cubic-bezier(0.45, 0, 0.15, 1) forwards;
+}
+
+/* Reverse Animation (Light to Dark) */
+.tft-reverse .tft-flying-plane {
+    left: auto;
+    right: -100px;
+    transform: scaleX(-1);
+    animation: flyBack 2.6s cubic-bezier(0.45, 0, 0.15, 1) forwards;
+}
+
+.tft-reverse .tft-trail {
+    left: auto;
+    right: -100px;
+    background: linear-gradient(-90deg, transparent, var(--primary));
+    animation: trailBack 2.6s cubic-bezier(0.45, 0, 0.15, 1) forwards;
+}
+
+@keyframes flyAcross {
+    0% {
+        left: -100px;
+        transform: translateY(-50%) rotate(15deg);
+    }
+
+    50% {
+        transform: translateY(-50%) rotate(0deg) scale(1.5);
+    }
+
+    100% {
+        left: 110vw;
+        transform: translateY(-50%) rotate(-15deg);
+    }
+}
+
+@keyframes flyBack {
+    0% {
+        right: -100px;
+        transform: translateY(-50%) scaleX(-1) rotate(15deg);
+    }
+
+    50% {
+        transform: translateY(-50%) scaleX(-1) rotate(0deg) scale(1.5);
+    }
+
+    100% {
+        right: 110vw;
+        transform: translateY(-50%) scaleX(-1) rotate(-15deg);
+    }
+}
+
+@keyframes trailAcross {
+    0% {
+        left: -300px;
+        transform: translateY(-50%);
+    }
+
+    100% {
+        left: calc(110vw - 200px);
+        transform: translateY(-50%);
+    }
+}
+
+@keyframes trailBack {
+    0% {
+        right: -300px;
+        transform: translateY(-50%);
+    }
+
+    100% {
+        right: calc(110vw - 200px);
+        transform: translateY(-50%);
+    }
+}
