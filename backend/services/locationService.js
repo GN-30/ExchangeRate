@@ -1,4 +1,5 @@
 const axios = require('axios');
+
 require('dotenv').config();
 
 
@@ -9,7 +10,7 @@ require('dotenv').config();
 const NOMINATIM_URL =
     'https://nominatim.openstreetmap.org';
 
-const NOMINATIM_DELAY = 1100; // ~1 request/sec
+const NOMINATIM_DELAY = 1100;
 
 
 // ======================================================
@@ -90,6 +91,7 @@ const countryCurrencyMap = {
     MA: 'MAD',
     TZ: 'TZS',
     UG: 'UGX'
+
 };
 
 
@@ -158,6 +160,7 @@ const currencySymbols = {
     CLP: '$',
     COP: '$',
     PEN: 'S/'
+
 };
 
 
@@ -171,16 +174,12 @@ const searchCache = new Map();
 
 const landmarkCache = new Map();
 
-
-// Cache duration
-// 1 hour
-
 const CACHE_DURATION =
     60 * 60 * 1000;
 
 
 // ======================================================
-// NOMINATIM REQUEST QUEUE
+// NOMINATIM QUEUE
 // ======================================================
 
 let lastNominatimRequest = 0;
@@ -190,8 +189,12 @@ let nominatimQueue =
 
 
 const wait = (ms) =>
-    new Promise(resolve =>
-        setTimeout(resolve, ms)
+    new Promise(
+        resolve =>
+            setTimeout(
+                resolve,
+                ms
+            )
     );
 
 
@@ -199,46 +202,54 @@ const queueNominatimRequest = (
     requestFunction
 ) => {
 
-    const run = nominatimQueue.then(
-        async () => {
+    const run =
+        nominatimQueue.then(
+            async () => {
 
-            const now =
-                Date.now();
+                const now =
+                    Date.now();
 
-            const elapsed =
-                now - lastNominatimRequest;
+                const elapsed =
+                    now -
+                    lastNominatimRequest;
 
-            if (
-                elapsed <
-                NOMINATIM_DELAY
-            ) {
 
-                await wait(
-                    NOMINATIM_DELAY -
-                    elapsed
-                );
+                if (
+                    elapsed <
+                    NOMINATIM_DELAY
+                ) {
+
+                    await wait(
+                        NOMINATIM_DELAY -
+                        elapsed
+                    );
+
+                }
+
+
+                lastNominatimRequest =
+                    Date.now();
+
+
+                return requestFunction();
 
             }
+        );
 
-            lastNominatimRequest =
-                Date.now();
-
-            return requestFunction();
-
-        }
-    );
-
-    // Keep queue alive even if one request fails
 
     nominatimQueue =
-        run.catch(() => { });
+        run.catch(
+            () => { }
+        );
+
 
     return run;
+
 };
 
 
 // ======================================================
-// NOMINATIM REQUEST WITH RETRY
+// NOMINATIM REQUEST
 // ======================================================
 
 const nominatimRequest = async (
@@ -258,6 +269,7 @@ const nominatimRequest = async (
 
         attempt++;
 
+
         try {
 
             return await queueNominatimRequest(
@@ -266,31 +278,35 @@ const nominatimRequest = async (
                     return await axios.get(
                         `${NOMINATIM_URL}/search`,
                         {
+
                             params: {
                                 ...params
                             },
 
                             headers: {
+
                                 'User-Agent':
-                                    'VoyageAI/1.0 (travel-planner)'
+                                    'VoyageAI/1.0 (travel-planner)',
+
+                                'Accept-Language':
+                                    'en'
+
                             },
 
                             timeout
+
                         }
                     );
 
                 }
             );
 
+
         } catch (error) {
 
             const status =
                 error.response?.status;
 
-
-            // ------------------------------------------
-            // Rate limited
-            // ------------------------------------------
 
             if (
                 status === 429 &&
@@ -344,8 +360,9 @@ const getCountryAndCurrency =
     async (placeName) => {
 
         const cleanPlace =
-            String(placeName || '')
-                .trim();
+            String(
+                placeName || ''
+            ).trim();
 
 
         if (!cleanPlace) {
@@ -361,9 +378,9 @@ const getCountryAndCurrency =
             cleanPlace.toLowerCase();
 
 
-        // ------------------------------------------
-        // CACHE CHECK
-        // ------------------------------------------
+        // ==================================================
+        // CACHE
+        // ==================================================
 
         const cached =
             locationCache.get(
@@ -382,6 +399,7 @@ const getCountryAndCurrency =
                 `Location cache hit: ${cleanPlace}`
             );
 
+
             return cached.data;
 
         }
@@ -389,17 +407,29 @@ const getCountryAndCurrency =
 
         try {
 
-            // ------------------------------------------
-            // Nominatim
-            // ------------------------------------------
+            // ==================================================
+            // NOMINATIM
+            // ==================================================
 
             const geoResponse =
                 await nominatimRequest(
                     {
-                        q: cleanPlace,
-                        format: 'json',
-                        addressdetails: 1,
-                        limit: 1
+
+                        q:
+                            cleanPlace,
+
+                        format:
+                            'json',
+
+                        addressdetails:
+                            1,
+
+                        limit:
+                            5,
+
+                        namedetails:
+                            1
+
                     },
                     15000
                 );
@@ -417,12 +447,23 @@ const getCountryAndCurrency =
             }
 
 
+            /*
+             * --------------------------------------------------
+             * IMPORTANT
+             *
+             * Prefer the first meaningful location result.
+             *
+             * We DO NOT use country as resolvedName.
+             * --------------------------------------------------
+             */
+
             const location =
                 geoResponse.data[0];
 
 
             const address =
-                location.address || {};
+                location.address ||
+                {};
 
 
             const countryCode =
@@ -448,21 +489,15 @@ const getCountryAndCurrency =
             );
 
 
-            // ------------------------------------------
+            // ==================================================
             // CURRENCY
-            //
-            // First use local map.
-            // ------------------------------------------
+            // ==================================================
 
             let currencyCode =
                 countryCurrencyMap[
                 countryCode
                 ];
 
-
-            // ------------------------------------------
-            // Fallback to countries.dev
-            // ------------------------------------------
 
             if (!currencyCode) {
 
@@ -478,7 +513,8 @@ const getCountryAndCurrency =
 
 
                     const currencies =
-                        countryResponse.data
+                        countryResponse
+                            .data
                             ?.currencies;
 
 
@@ -492,7 +528,9 @@ const getCountryAndCurrency =
 
                     }
 
-                } catch (currencyError) {
+                } catch (
+                currencyError
+                ) {
 
                     console.warn(
                         `Currency API failed for ${countryCode}:`,
@@ -522,9 +560,9 @@ const getCountryAndCurrency =
             );
 
 
-            // ------------------------------------------
-            // Parent location
-            // ------------------------------------------
+            // ==================================================
+            // PARENT LOCATION
+            // ==================================================
 
             const parentLocation =
                 address.city ||
@@ -535,23 +573,112 @@ const getCountryAndCurrency =
                 countryName;
 
 
+            // ==================================================
+            // RESOLVED PLACE
+            // ==================================================
+
+            /*
+             * IMPORTANT FIX
+             *
+             * Do NOT blindly use:
+             *
+             * location.display_name.split(',')[0]
+             *
+             * because Nominatim can return a result where
+             * the first component is not the place selected
+             * by the user.
+             *
+             * We first try the actual Nominatim `name`.
+             * If unavailable, use namedetails.
+             * If still unavailable, use the original query.
+             *
+             * Most importantly, NEVER fall back to countryName.
+             */
+
+            const nominatimName =
+                String(
+                    location.name ||
+                    location.namedetails?.name ||
+                    ''
+                ).trim();
+
+
             const resolvedName =
-                location.display_name
-                    ?.split(',')[0]
-                    ?.trim() ||
+                nominatimName ||
                 cleanPlace;
 
 
+            /*
+             * If Nominatim somehow returns the country itself
+             * as the name, preserve the user's original search
+             * instead of saving the country.
+             */
+
+            const safeResolvedName =
+                (
+                    resolvedName.toLowerCase() ===
+                    String(
+                        countryName || ''
+                    ).trim().toLowerCase()
+                )
+                    ? cleanPlace
+                    : resolvedName;
+
+
+            console.log(
+                '[Location Service] Original place:',
+                cleanPlace
+            );
+
+
+            console.log(
+                '[Location Service] Nominatim name:',
+                nominatimName
+            );
+
+
+            console.log(
+                '[Location Service] Final resolved place:',
+                safeResolvedName
+            );
+
+
+            console.log(
+                '[Location Service] Country:',
+                countryName
+            );
+
+
+            // ==================================================
+            // RESULT
+            // ==================================================
+
             const result = {
 
+                /*
+                 * Country information
+                 */
                 countryCode,
 
                 countryName,
 
-                resolvedName,
 
+                /*
+                 * ACTUAL PLACE
+                 */
+                resolvedName:
+                    safeResolvedName,
+
+
+                /*
+                 * Parent city/town/county
+                 */
                 parentLocation,
 
+
+                /*
+                 * Currency
+                 */
                 currencyCode,
 
                 currencySymbol:
@@ -560,24 +687,27 @@ const getCountryAndCurrency =
                     ] ||
                     currencyCode,
 
+
                 isIndia:
                     countryCode === 'IN'
 
             };
 
 
-            // ------------------------------------------
-            // SAVE CACHE
-            // ------------------------------------------
+            // ==================================================
+            // CACHE
+            // ==================================================
 
             locationCache.set(
                 cacheKey,
                 {
+
                     timestamp:
                         Date.now(),
 
                     data:
                         result
+
                 }
             );
 
@@ -592,6 +722,7 @@ const getCountryAndCurrency =
                 error.message
             );
 
+
             throw error;
 
         }
@@ -601,21 +732,15 @@ const getCountryAndCurrency =
 
 // ======================================================
 // SEARCH LOCATIONS
-//
-// Used by BOTH:
-//
-// PlanTrip
-// Trends
-//
-// This is the important endpoint for your dropdown.
 // ======================================================
 
 const searchLocations =
     async (query) => {
 
         const cleanQuery =
-            String(query || '')
-                .trim();
+            String(
+                query || ''
+            ).trim();
 
 
         if (
@@ -631,9 +756,9 @@ const searchLocations =
             cleanQuery.toLowerCase();
 
 
-        // ------------------------------------------
+        // ==================================================
         // CACHE
-        // ------------------------------------------
+        // ==================================================
 
         const cached =
             searchCache.get(
@@ -652,6 +777,7 @@ const searchLocations =
                 `Search cache hit: ${cleanQuery}`
             );
 
+
             return cached.data;
 
         }
@@ -667,6 +793,7 @@ const searchLocations =
             const response =
                 await nominatimRequest(
                     {
+
                         q:
                             cleanQuery,
 
@@ -676,8 +803,12 @@ const searchLocations =
                         addressdetails:
                             1,
 
+                        namedetails:
+                            1,
+
                         limit:
                             8
+
                     },
                     10000
                 );
@@ -688,48 +819,92 @@ const searchLocations =
                     response.data ||
                     []
                 ).map(
-                    item => ({
+                    item => {
 
-                        display_name:
-                            item.display_name,
+                        const address =
+                            item.address ||
+                            {};
 
-                        name:
-                            item.name,
 
-                        lat:
-                            item.lat,
+                        /*
+                         * Prefer Nominatim's actual name.
+                         * This is what the frontend should
+                         * send back as the selected place.
+                         */
 
-                        lon:
-                            item.lon,
+                        const placeName =
+                            String(
+                                item.name ||
+                                item.namedetails?.name ||
+                                item.display_name
+                                    ?.split(',')[0] ||
+                                ''
+                            ).trim();
 
-                        type:
-                            item.type,
 
-                        country:
-                            item.address
-                                ?.country,
+                        return {
 
-                        countryCode:
-                            item.address
-                                ?.country_code
-                                ?.toUpperCase()
+                            display_name:
+                                item.display_name,
 
-                    })
+                            /*
+                             * IMPORTANT:
+                             * This is the actual place name.
+                             */
+                            name:
+                                placeName,
+
+                            lat:
+                                item.lat,
+
+                            lon:
+                                item.lon,
+
+                            type:
+                                item.type,
+
+                            country:
+                                address.country,
+
+                            countryCode:
+                                address.country_code
+                                    ?.toUpperCase(),
+
+                            city:
+                                address.city ||
+                                address.town ||
+                                address.village ||
+                                address.municipality ||
+                                '',
+
+                            /*
+                             * Useful if the frontend
+                             * wants the complete selected
+                             * location object.
+                             */
+                            place:
+                                placeName
+
+                        };
+
+                    }
                 );
 
 
-            // ------------------------------------------
-            // SAVE CACHE
-            // ------------------------------------------
+            // ==================================================
+            // CACHE
+            // ==================================================
 
             searchCache.set(
                 cacheKey,
                 {
+
                     timestamp:
                         Date.now(),
 
                     data:
                         results
+
                 }
             );
 
@@ -746,8 +921,6 @@ const searchLocations =
             );
 
 
-            // Don't crash frontend
-
             return [];
 
         }
@@ -763,8 +936,9 @@ const getLandmarks =
     async (destination) => {
 
         const cleanDestination =
-            String(destination || '')
-                .trim();
+            String(
+                destination || ''
+            ).trim();
 
 
         if (!cleanDestination) {
@@ -778,9 +952,9 @@ const getLandmarks =
             cleanDestination.toLowerCase();
 
 
-        // ------------------------------------------
+        // ==================================================
         // CACHE
-        // ------------------------------------------
+        // ==================================================
 
         const cached =
             landmarkCache.get(
@@ -798,6 +972,7 @@ const getLandmarks =
             console.log(
                 `Landmark cache hit: ${cleanDestination}`
             );
+
 
             return cached.data;
 
@@ -828,14 +1003,9 @@ const getLandmarks =
             let allLandmarks = [];
 
 
-            /*
-             * IMPORTANT:
-             *
-             * Do NOT use Promise.all here.
-             *
-             * Promise.all would send 13 simultaneous
-             * Nominatim requests and cause 429.
-             */
+            // ==================================================
+            // CATEGORY SEARCH
+            // ==================================================
 
             for (
                 const category
@@ -847,6 +1017,7 @@ const getLandmarks =
                     const response =
                         await nominatimRequest(
                             {
+
                                 q:
                                     `${category} in ${cleanDestination}`,
 
@@ -858,6 +1029,7 @@ const getLandmarks =
 
                                 addressdetails:
                                     1
+
                             },
                             20000
                         );
@@ -878,10 +1050,6 @@ const getLandmarks =
                 }
 
 
-                /*
-                 * Stop early once we have enough.
-                 */
-
                 if (
                     allLandmarks.length >= 30
                 ) {
@@ -893,9 +1061,9 @@ const getLandmarks =
             }
 
 
-            // ------------------------------------------
-            // Broader search if necessary
-            // ------------------------------------------
+            // ==================================================
+            // BROADER SEARCH
+            // ==================================================
 
             if (
                 allLandmarks.length < 15
@@ -906,6 +1074,7 @@ const getLandmarks =
                     const broaderResponse =
                         await nominatimRequest(
                             {
+
                                 q:
                                     `tourism in ${cleanDestination}`,
 
@@ -917,6 +1086,7 @@ const getLandmarks =
 
                                 addressdetails:
                                     1
+
                             },
                             20000
                         );
@@ -948,9 +1118,9 @@ const getLandmarks =
             }
 
 
-            // ------------------------------------------
+            // ==================================================
             // BLACKLIST
-            // ------------------------------------------
+            // ==================================================
 
             const blacklist = [
 
@@ -1002,145 +1172,164 @@ const getLandmarks =
 
                     .sort(
                         (a, b) =>
-                            (b.importance || 0) -
-                            (a.importance || 0)
+                            (
+                                b.importance ||
+                                0
+                            ) -
+                            (
+                                a.importance ||
+                                0
+                            )
                     )
 
-                    .filter(item => {
+                    .filter(
+                        item => {
 
-                        const fullName =
-                            (
-                                item.display_name ||
-                                ''
-                            ).toLowerCase();
-
-
-                        const firstName =
-                            (
-                                item.display_name ||
-                                ''
-                            )
-                                .split(',')[0]
-                                .trim();
+                            const fullName =
+                                (
+                                    item.display_name ||
+                                    ''
+                                ).toLowerCase();
 
 
-                        const itemClass =
-                            (
-                                item.class ||
-                                ''
-                            ).toLowerCase();
+                            const firstName =
+                                (
+                                    item.display_name ||
+                                    ''
+                                )
+                                    .split(',')[0]
+                                    .trim();
 
 
-                        const itemType =
-                            (
-                                item.type ||
-                                ''
-                            ).toLowerCase();
+                            const itemClass =
+                                (
+                                    item.class ||
+                                    ''
+                                ).toLowerCase();
 
 
-                        if (
-                            seen.has(firstName)
-                        ) {
+                            const itemType =
+                                (
+                                    item.type ||
+                                    ''
+                                ).toLowerCase();
+
+
+                            if (
+                                seen.has(
+                                    firstName
+                                )
+                            ) {
+
+                                return false;
+
+                            }
+
+
+                            if (
+                                firstName.length < 3
+                            ) {
+
+                                return false;
+
+                            }
+
+
+                            const isBlacklisted =
+                                blacklist.some(
+                                    word =>
+                                        fullName.includes(word) ||
+                                        itemClass.includes(word) ||
+                                        itemType.includes(word)
+                                );
+
+
+                            const isTouristClass =
+                                [
+
+                                    'tourism',
+                                    'historic',
+                                    'heritage',
+                                    'amenity',
+                                    'leisure',
+                                    'natural'
+
+                                ].includes(
+                                    itemClass
+                                );
+
+
+                            if (
+                                !isBlacklisted &&
+                                (
+                                    item.importance > 0.4 ||
+                                    isTouristClass
+                                )
+                            ) {
+
+                                seen.add(
+                                    firstName
+                                );
+
+                                return true;
+
+                            }
+
 
                             return false;
 
                         }
+                    )
+
+                    .slice(
+                        0,
+                        30
+                    )
+
+                    .map(
+                        item => ({
+
+                            name:
+                                item.display_name
+                                    .split(',')[0]
+                                    .trim(),
+
+                            address:
+                                item.display_name,
+
+                            type:
+                                item.type,
+
+                            class:
+                                item.class,
+
+                            importance:
+                                item.importance,
+
+                            lat:
+                                item.lat,
+
+                            lon:
+                                item.lon
+
+                        })
+                    );
 
 
-                        if (
-                            firstName.length < 3
-                        ) {
-
-                            return false;
-
-                        }
-
-
-                        const isBlacklisted =
-                            blacklist.some(
-                                word =>
-                                    fullName.includes(word) ||
-                                    itemClass.includes(word) ||
-                                    itemType.includes(word)
-                            );
-
-
-                        const isTouristClass =
-                            [
-                                'tourism',
-                                'historic',
-                                'heritage',
-                                'amenity',
-                                'leisure',
-                                'natural'
-                            ].includes(
-                                itemClass
-                            );
-
-
-                        if (
-                            !isBlacklisted &&
-                            (
-                                item.importance > 0.4 ||
-                                isTouristClass
-                            )
-                        ) {
-
-                            seen.add(
-                                firstName
-                            );
-
-                            return true;
-
-                        }
-
-
-                        return false;
-
-                    })
-
-                    .slice(0, 30)
-
-                    .map(item => ({
-
-                        name:
-                            item.display_name
-                                .split(',')[0]
-                                .trim(),
-
-                        address:
-                            item.display_name,
-
-                        type:
-                            item.type,
-
-                        class:
-                            item.class,
-
-                        importance:
-                            item.importance,
-
-                        lat:
-                            item.lat,
-
-                        lon:
-                            item.lon
-
-                    }));
-
-
-            // ------------------------------------------
+            // ==================================================
             // CACHE
-            // ------------------------------------------
+            // ==================================================
 
             landmarkCache.set(
                 cacheKey,
                 {
+
                     timestamp:
                         Date.now(),
 
                     data:
                         landmarks
+
                 }
             );
 
@@ -1154,6 +1343,7 @@ const getLandmarks =
                 'Landmark Search Error:',
                 error.message
             );
+
 
             return [];
 

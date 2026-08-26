@@ -3,17 +3,14 @@ const {
     generateItinerary
 } = require('../services/aiEstimationService');
 
-
 const {
     getCountryAndCurrency,
     getLandmarks
 } = require('../services/locationService');
 
-
 const {
     getExchangeRate
 } = require('../services/exchangeRateService');
-
 
 const {
     groupLandmarksByDistance
@@ -27,27 +24,13 @@ const jwt = require('jsonwebtoken');
 // CALCULATE ITINERARY
 // ============================================================
 
-const calculateItinerary = async (
-    req,
-    res
-) => {
+const calculateItinerary = async (req, res) => {
 
     try {
 
-        console.log(
-            '\n===================================='
-        );
-
-
-        console.log(
-            '[Itinerary Controller] New request'
-        );
-
-
-        console.log(
-            'Request body:',
-            req.body
-        );
+        console.log('\n====================================');
+        console.log('[Itinerary Controller] New request');
+        console.log('Request body:', req.body);
 
 
         let {
@@ -58,30 +41,67 @@ const calculateItinerary = async (
             travelType
         } = req.body;
 
-        if (!budgetINR || Number(budgetINR) <= 0) {
-            const budgetMap = { Budget: 5000, Medium: 10000, High: 20000, Luxury: 50000 };
-            const perDay = budgetMap[budget] || 10000;
-            budgetINR = Number(days || 3) * perDay;
-            console.log(`[Itinerary Controller] Calculated default budgetINR: ₹${budgetINR} based on level '${budget}' and ${days} days`);
+
+        // ====================================================
+        // KEEP THE EXACT PLACE ENTERED BY THE USER
+        // ====================================================
+
+        if (!destination) {
+
+            return res.status(400).json({
+                error: 'Destination is required'
+            });
+
         }
 
-        console.log(
-            '[Itinerary Controller] Destination:',
-            destination
-        );
+        const searchedPlace =
+            String(destination).trim();
 
+
+        // ====================================================
+        // DEFAULT BUDGET
+        // ====================================================
+
+        if (
+            !budgetINR ||
+            Number(budgetINR) <= 0
+        ) {
+
+            const budgetMap = {
+                Budget: 5000,
+                Medium: 10000,
+                High: 20000,
+                Luxury: 50000
+            };
+
+            const perDay =
+                budgetMap[budget] ||
+                10000;
+
+            budgetINR =
+                Number(days || 3) *
+                perDay;
+
+            console.log(
+                `[Itinerary Controller] Calculated default budgetINR: ₹${budgetINR}`
+            );
+        }
+
+
+        console.log(
+            '[Itinerary Controller] User entered place:',
+            searchedPlace
+        );
 
         console.log(
             '[Itinerary Controller] Days:',
             days
         );
 
-
         console.log(
             '[Itinerary Controller] Final Budget INR:',
             budgetINR
         );
-
 
         console.log(
             '[Itinerary Controller] Travel type:',
@@ -93,26 +113,15 @@ const calculateItinerary = async (
         // VALIDATION
         // ====================================================
 
-        if (!destination) {
-
-            return res.status(400).json({
-
-                error:
-                    'Destination is required'
-            });
-        }
-
-
         if (
             !days ||
             Number(days) <= 0
         ) {
 
             return res.status(400).json({
-
-                error:
-                    'Invalid number of days'
+                error: 'Invalid number of days'
             });
+
         }
 
 
@@ -122,10 +131,9 @@ const calculateItinerary = async (
         ) {
 
             return res.status(400).json({
-
-                error:
-                    'Invalid budget amount'
+                error: 'Invalid budget amount'
             });
+
         }
 
 
@@ -140,7 +148,7 @@ const calculateItinerary = async (
 
         const location =
             await getCountryAndCurrency(
-                destination
+                searchedPlace
             );
 
 
@@ -150,17 +158,58 @@ const calculateItinerary = async (
         );
 
 
-        const resolvedDestination =
-            location.resolvedName ||
-            destination;
+        /*
+         * IMPORTANT
+         *
+         * resolvedPlace = actual place
+         *
+         * countryName = country
+         *
+         * We NEVER use countryName as the destination.
+         */
 
+        const resolvedPlace =
+            (
+                location.resolvedName &&
+                String(
+                    location.resolvedName
+                ).trim()
+            )
+                ? String(
+                    location.resolvedName
+                ).trim()
+                : searchedPlace;
+
+
+        /*
+         * This is ONLY for the AI.
+         *
+         * Example:
+         *
+         * resolvedPlace = Nainital
+         * countryName   = India
+         *
+         * AI receives:
+         *
+         * Nainital, India
+         */
 
         const itineraryDestination =
-            `${resolvedDestination}, ${location.countryName}`;
+            `${resolvedPlace}, ${location.countryName}`;
 
 
         console.log(
-            '[Itinerary Controller] Resolved destination:',
+            '[Itinerary Controller] PLACE:',
+            resolvedPlace
+        );
+
+        console.log(
+            '[Itinerary Controller] COUNTRY:',
+            location.countryName
+        );
+
+        console.log(
+            '[Itinerary Controller] AI destination:',
             itineraryDestination
         );
 
@@ -186,7 +235,7 @@ const calculateItinerary = async (
 
 
         // ====================================================
-        // BUDGET
+        // BUDGET ESTIMATION
         // ====================================================
 
         console.log(
@@ -210,6 +259,7 @@ const calculateItinerary = async (
 
                 currency:
                     location.currencyCode
+
             });
 
 
@@ -230,7 +280,7 @@ const calculateItinerary = async (
 
         const landmarks =
             await getLandmarks(
-                resolvedDestination
+                resolvedPlace
             );
 
 
@@ -247,8 +297,10 @@ const calculateItinerary = async (
             return res.status(404).json({
 
                 error:
-                    `No real landmarks found for ${resolvedDestination}`
+                    `No real landmarks found for ${resolvedPlace}`
+
             });
+
         }
 
 
@@ -277,13 +329,11 @@ const calculateItinerary = async (
 
                 error:
                     'Could not geographically group landmarks'
+
             });
+
         }
 
-
-        // ----------------------------------------------------
-        // Print grouping
-        // ----------------------------------------------------
 
         groupedLandmarks.forEach(
             (
@@ -302,8 +352,10 @@ const calculateItinerary = async (
                         console.log(
                             `  ${place.name} - ${place.distanceFromCenter} km`
                         );
+
                     }
                 );
+
             }
         );
 
@@ -320,6 +372,11 @@ const calculateItinerary = async (
         const itinerary =
             await generateItinerary({
 
+                /*
+                 * AI gets:
+                 * Nainital, India
+                 */
+
                 destination:
                     itineraryDestination,
 
@@ -331,8 +388,6 @@ const calculateItinerary = async (
 
                 travelType,
 
-                // IMPORTANT:
-                // Pass grouped landmarks
                 landmarks:
                     groupedLandmarks,
 
@@ -348,7 +403,9 @@ const calculateItinerary = async (
                         location.currencySymbol,
 
                     rate
+
                 }
+
             });
 
 
@@ -358,113 +415,350 @@ const calculateItinerary = async (
 
 
         // ====================================================
-        // SAVE TRIP TO DATABASE FOR USER HISTORY/PROFILE
+        // AUTHENTICATED USER
         // ====================================================
 
         let userId = null;
-        const authHeader = req.header('Authorization');
+
+
+        const authHeader =
+            req.header('Authorization');
+
+
         if (authHeader) {
-            const token = authHeader.replace('Bearer ', '');
-            try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
-                userId = decoded.id;
-            } catch (jwtErr) {
-                console.log('[Itinerary Controller] Token verification notice:', jwtErr.message);
-            }
-        }
 
-        let savedTripId = null;
-        if (userId) {
-            try {
-                const convertedBudget = (Number(budgetINR) * Number(rate)).toFixed(2);
-                const suggestionsList = itinerary?.suggestions || [
-                    `Explore top attractions in ${resolvedDestination}`,
-                    `Daily budget allocation: ${location.currencySymbol}${(convertedBudget / Number(days)).toFixed(0)}`,
-                    `Use local transit for easy travel`
-                ];
-
-                const insertRes = await db.query(
-                    `INSERT INTO trips (
-                        user_id,
-                        destination_country,
-                        destinations,
-                        days,
-                        budget_inr,
-                        travel_type,
-                        converted_budget,
-                        currency_code,
-                        exchange_rate,
-                        breakdown,
-                        suggestions,
-                        itinerary
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                    RETURNING id`,
-                    [
-                        userId,
-                        location.countryName || resolvedDestination,
-                        JSON.stringify([resolvedDestination]),
-                        Number(days),
-                        Number(budgetINR),
-                        travelType || 'Solo',
-                        convertedBudget,
-                        location.currencyCode,
-                        Number(rate),
-                        JSON.stringify(budgetResult),
-                        JSON.stringify(suggestionsList),
-                        JSON.stringify(itinerary)
-                    ]
+            const token =
+                authHeader.replace(
+                    'Bearer ',
+                    ''
                 );
 
-                if (insertRes.rows && insertRes.rows.length > 0) {
-                    savedTripId = insertRes.rows[0].id;
-                    console.log('[Itinerary Controller] Successfully saved trip to DB with ID:', savedTripId);
-                }
-            } catch (dbErr) {
-                console.error('[Itinerary Controller] Failed to save trip to database:', dbErr.message);
+
+            try {
+
+                const decoded =
+                    jwt.verify(
+                        token,
+                        process.env.JWT_SECRET ||
+                        'secret_key'
+                    );
+
+
+                userId =
+                    decoded.id;
+
+
+            } catch (jwtErr) {
+
+                console.log(
+                    '[Itinerary Controller] Token verification notice:',
+                    jwtErr.message
+                );
+
             }
+
         }
+
+
+        // ====================================================
+        // SAVE TRIP
+        // ====================================================
+
+        let savedTrip = null;
+
+
+        if (userId) {
+
+            try {
+
+                const convertedBudget =
+                    (
+                        Number(budgetINR) *
+                        Number(rate)
+                    ).toFixed(2);
+
+
+                const suggestionsList =
+                    itinerary?.suggestions ||
+                    [
+
+                        `Explore top attractions in ${resolvedPlace}`,
+
+                        `Daily budget allocation: ${location.currencySymbol}${(
+                            convertedBudget /
+                            Number(days)
+                        ).toFixed(0)}`,
+
+                        `Use local transit for easy travel`
+
+                    ];
+
+
+                console.log(
+                    '[Itinerary Controller] Saving complete itinerary to database...'
+                );
+
+
+                console.log(
+                    '[Itinerary Controller] PLACE TO SAVE:',
+                    resolvedPlace
+                );
+
+
+                console.log(
+                    '[Itinerary Controller] COUNTRY:',
+                    location.countryName
+                );
+
+
+                console.log(
+                    '[Itinerary Controller] AI DESTINATION:',
+                    itineraryDestination
+                );
+
+
+                // ====================================================
+                // SAVE TO DATABASE
+                // ====================================================
+
+                const insertRes =
+                    await db.query(
+
+                        `INSERT INTO trips (
+                            user_id,
+                            destination_country,
+                            destinations,
+                            days,
+                            budget_inr,
+                            travel_type,
+                            converted_budget,
+                            currency_code,
+                            exchange_rate,
+                            breakdown,
+                            suggestions,
+                            itinerary
+                        )
+                        VALUES (
+                            $1,
+                            $2,
+                            $3,
+                            $4,
+                            $5,
+                            $6,
+                            $7,
+                            $8,
+                            $9,
+                            $10,
+                            $11,
+                            $12
+                        )
+                        RETURNING *`,
+
+                        [
+
+                            // User
+                            userId,
+
+
+                            // IMPORTANT:
+                            // SAVE PLACE, NOT COUNTRY
+                            resolvedPlace,
+
+
+                            // Save place in destinations
+                            JSON.stringify([
+                                resolvedPlace
+                            ]),
+
+
+                            // Days
+                            Number(days),
+
+
+                            // INR budget
+                            Number(budgetINR),
+
+
+                            // Travel type
+                            travelType ||
+                            'Solo',
+
+
+                            // Converted budget
+                            convertedBudget,
+
+
+                            // Country currency
+                            location.currencyCode,
+
+
+                            // Exchange rate
+                            Number(rate),
+
+
+                            // Budget breakdown
+                            JSON.stringify(
+                                budgetResult
+                            ),
+
+
+                            // Suggestions
+                            JSON.stringify(
+                                suggestionsList
+                            ),
+
+
+                            // COMPLETE ITINERARY
+                            JSON.stringify(
+                                itinerary
+                            )
+
+                        ]
+
+                    );
+
+
+                if (
+                    insertRes.rows &&
+                    insertRes.rows.length > 0
+                ) {
+
+                    savedTrip =
+                        insertRes.rows[0];
+
+
+                    console.log(
+                        '[Itinerary Controller] Trip successfully saved.'
+                    );
+
+
+                    console.log(
+                        '[Itinerary Controller] Database Trip ID:',
+                        savedTrip.id
+                    );
+
+
+                    console.log(
+                        '[Itinerary Controller] Saved destination:',
+                        savedTrip.destination_country
+                    );
+
+                }
+
+            } catch (dbErr) {
+
+                console.error(
+                    '[Itinerary Controller] Failed to save trip:',
+                    dbErr.message
+                );
+
+
+                console.error(
+                    dbErr.stack
+                );
+
+            }
+
+        } else {
+
+            console.log(
+                '[Itinerary Controller] No authenticated user. Trip will not be saved.'
+            );
+
+        }
+
 
         // ====================================================
         // FINAL RESPONSE
         // ====================================================
 
+        /*
+         * Use the saved database row as the source of truth.
+         */
+
         const response = {
 
-            id: savedTripId,
+            // Real database trip ID
+            id:
+                savedTrip?.id ||
+                null,
 
+
+            // IMPORTANT:
+            // Return PLACE, not country
             destination:
-                resolvedDestination,
+                savedTrip?.destination_country ||
+                resolvedPlace,
 
+
+            // Country separately
             country:
                 location.countryName,
+
 
             countryCode:
                 location.countryCode,
 
+
+            // Currency
             currencyCode:
+                savedTrip?.currency_code ||
                 location.currencyCode,
+
 
             currencySymbol:
                 location.currencySymbol,
 
-            rate,
 
+            // Exchange rate
+            rate:
+                Number(
+                    savedTrip?.exchange_rate ||
+                    rate
+                ),
+
+
+            // Days
             days:
-                Number(days),
+                Number(
+                    savedTrip?.days ||
+                    days
+                ),
 
+
+            // INR budget
             budgetINR:
-                Number(budgetINR),
+                Number(
+                    savedTrip?.budget_inr ||
+                    budgetINR
+                ),
 
-            travelType,
 
+            // Travel type
+            travelType:
+                savedTrip?.travel_type ||
+                travelType,
+
+
+            // Budget breakdown
             breakdown:
+                savedTrip?.breakdown ||
                 budgetResult,
 
-            itinerary,
 
+            // Complete generated itinerary
+            itinerary:
+                savedTrip?.itinerary ||
+                itinerary,
+
+
+            // Real landmarks
             landmarks,
 
+
+            // Geographically grouped landmarks
             groupedLandmarks
+
         };
 
 
@@ -473,9 +767,27 @@ const calculateItinerary = async (
         );
 
 
-        return res.status(200).json(
-            response
+        console.log(
+            '[Itinerary Controller] Saved Trip ID:',
+            response.id
         );
+
+
+        console.log(
+            '[Itinerary Controller] Final destination:',
+            response.destination
+        );
+
+
+        console.log(
+            '[Itinerary Controller] Itinerary included:',
+            !!response.itinerary
+        );
+
+
+        return res
+            .status(200)
+            .json(response);
 
 
     } catch (error) {
@@ -506,10 +818,17 @@ const calculateItinerary = async (
             error:
                 error.message ||
                 'Failed to generate itinerary'
+
         });
+
     }
+
 };
 
+
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = {
     calculateItinerary

@@ -10,6 +10,10 @@ const ExpenseTracker = () => {
     const { user } = useContext(AuthContext);
     const [latestTrip, setLatestTrip] = useState(null);
     const [expenses, setExpenses] = useState([]);
+    const [tripLoading, setTripLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
     const [formData, setFormData] = useState({ 
         category: 'Food', 
         amount_inr: '', 
@@ -19,90 +23,302 @@ const ExpenseTracker = () => {
     });
 
     useEffect(() => {
-        fetchLatestTrip().then(() => fetchExpenses());
+        const initialise = async () => {
+            const trip = await fetchActiveTrip();
+            await fetchExpenses(trip?.id);
+        };
+
+        initialise();
     }, []);
 
-    const fetchLatestTrip = async () => {
+    // Load the exact trip selected from Profile.
+    // Never invent a trip id or fall back to a fake id.
+    const fetchActiveTrip = async () => {
+        setTripLoading(true);
+        setErrorMessage('');
+
         let loadedTrip = null;
+
         try {
             const token = sessionStorage.getItem('token');
-            const activeId = sessionStorage.getItem('active_trip_id') || 'latest';
-            if (token) {
-                const res = await axios.get(`${API_BASE}/trips/${activeId}`, { headers: { Authorization: `Bearer ${token}` }});
-                if (res.data) {
+            const activeId = sessionStorage.getItem('active_trip_id');
+
+            if (token && activeId && activeId !== 'null' && activeId !== 'undefined') {
+                const res = await axios.get(
+                    `${API_BASE}/trips/${activeId}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+
+                if (res.data?.id) {
                     loadedTrip = res.data;
-                    if (res.data.id) sessionStorage.setItem('active_trip_id', res.data.id);
+                    sessionStorage.setItem(
+                        'active_trip_id',
+                        String(res.data.id)
+                    );
                 }
             }
         } catch (e) {
-            console.error('Failed to fetch trip from API', e);
+            console.error('Failed to fetch selected trip:', e);
         }
 
+        // If Profile did not provide an active trip, get the user's latest
+        // real database trip. This endpoint must return a trip with an id.
         if (!loadedTrip) {
             try {
-                const sessionRaw = sessionStorage.getItem('voyage_latest_trip');
+                const token = sessionStorage.getItem('token');
+
+                if (token) {
+                    const res = await axios.get(
+                        `${API_BASE}/trips/latest`,
+                        {
+                            headers: {
+                                Authorization: `Bearer ${token}`
+                            }
+                        }
+                    );
+
+                    if (res.data?.id) {
+                        loadedTrip = res.data;
+                        sessionStorage.setItem(
+                            'active_trip_id',
+                            String(res.data.id)
+                        );
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch latest trip:', e);
+            }
+        }
+
+        // Session data is only used if it contains a REAL database id.
+        if (!loadedTrip) {
+            try {
+                const sessionRaw =
+                    sessionStorage.getItem('voyage_latest_trip');
+
                 if (sessionRaw) {
-                    loadedTrip = JSON.parse(sessionRaw);
+                    const sessionTrip = JSON.parse(sessionRaw);
+
+                    if (sessionTrip?.id) {
+                        loadedTrip = sessionTrip;
+                        sessionStorage.setItem(
+                            'active_trip_id',
+                            String(sessionTrip.id)
+                        );
+                    }
                 }
             } catch (sErr) {
                 console.error('Failed to load session trip:', sErr);
             }
         }
 
-        if (loadedTrip) {
+        if (loadedTrip?.id) {
             setLatestTrip(loadedTrip);
+        } else {
+            setLatestTrip(null);
+            setErrorMessage(
+                'No saved trip was found. Please generate a trip or select one from your Profile.'
+            );
         }
+
+        setTripLoading(false);
+        return loadedTrip;
     };
 
-    const fetchExpenses = async () => {
+    const fetchExpenses = async (tripId = null) => {
         try {
             const token = sessionStorage.getItem('token');
-            const activeId = sessionStorage.getItem('active_trip_id');
-            if (token && activeId) {
-                const res = await axios.get(`${API_BASE}/expenses?tripId=${activeId}`, { headers: { Authorization: `Bearer ${token}` }});
-                if (Array.isArray(res.data)) {
-                    setExpenses(res.data);
+            const activeId =
+                tripId ||
+                sessionStorage.getItem('active_trip_id');
+
+            if (
+                !token ||
+                !activeId ||
+                activeId === 'null' ||
+                activeId === 'undefined'
+            ) {
+                setExpenses([]);
+                return;
+            }
+
+            const res = await axios.get(
+                `${API_BASE}/expenses?tripId=${encodeURIComponent(activeId)}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
                 }
+            );
+
+            if (Array.isArray(res.data)) {
+                setExpenses(res.data);
             }
         } catch (e) {
-            console.error(e);
+            console.error('Failed to load expenses:', e);
         }
     };
 
     const handleAdd = async (e) => {
         e.preventDefault();
+
+        if (saving) return;
+
+        setMessage('');
+        setErrorMessage('');
+
         try {
             const token = sessionStorage.getItem('token');
-            const activeId = sessionStorage.getItem('active_trip_id') || latestTrip?.id;
-            
-            if (token && activeId) {
-                await axios.post(`${API_BASE}/expenses`, { ...formData, trip_id: activeId }, { headers: { Authorization: `Bearer ${token}` }});
-                fetchExpenses();
-            } else {
-                // Local session fallback for offline/guest trip expense logging
-                const newLocalExpense = {
-                    id: Date.now(),
-                    category: formData.category,
-                    amount_inr: formData.amount_inr,
-                    amount_local: formData.amount_local,
-                    description: formData.description || formData.category,
-                    date: formData.date
-                };
-                setExpenses(prev => [newLocalExpense, ...prev]);
+            const activeId =
+                sessionStorage.getItem('active_trip_id') ||
+                latestTrip?.id;
+
+            // A real DB trip id is mandatory for a persisted expense.
+            if (!token) {
+                setErrorMessage('Please log in before recording an expense.');
+                return;
             }
-            setFormData({ ...formData, amount_inr: '', amount_local: '', description: '' });
+
+            if (
+                !activeId ||
+                activeId === 'null' ||
+                activeId === 'undefined'
+            ) {
+                setErrorMessage(
+                    'No active trip is selected. Go to Profile and choose "Track Expenses for this Trip".'
+                );
+                return;
+            }
+
+            if (!latestTrip?.id) {
+                setErrorMessage(
+                    'The selected trip could not be verified. Please return to Profile and select the trip again.'
+                );
+                return;
+            }
+
+            // Make sure the expense is attached to the same real trip
+            // currently shown in the page.
+            const tripId = String(activeId);
+
+            if (String(latestTrip.id) !== tripId) {
+                setErrorMessage(
+                    'The selected trip changed. Please return to Profile and open this trip again.'
+                );
+                return;
+            }
+
+            setSaving(true);
+
+            const payload = {
+                category: formData.category,
+                amount_inr: Number(formData.amount_inr),
+                amount_local: Number(formData.amount_local),
+                description:
+                    formData.description?.trim() ||
+                    formData.category,
+                date: formData.date,
+                trip_id: tripId
+            };
+
+            const response = await axios.post(
+                `${API_BASE}/expenses`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            // The backend response is the source of truth.
+            const createdExpense = response.data;
+
+            setExpenses(prev => [
+                createdExpense,
+                ...prev
+            ]);
+
+            setFormData(prev => ({
+                ...prev,
+                amount_inr: '',
+                amount_local: '',
+                description: ''
+            }));
+
+            setMessage('Expense recorded successfully.');
+
+            // Keep Recent Activity in sync with the saved DB record.
+            window.dispatchEvent(
+                new CustomEvent('voyage-expense-recorded', {
+                    detail: {
+                        ...createdExpense,
+                        trip_id: tripId
+                    }
+                })
+            );
+
+            // Refresh from DB so the list exactly matches the server.
+            await fetchExpenses(tripId);
+
         } catch (e) {
-            console.error(e);
+            console.error(
+                'Expense creation error:',
+                e.response?.data || e.message
+            );
+
+            const serverMessage =
+                e.response?.data?.error ||
+                e.response?.data?.message;
+
+            if (e.response?.status === 404) {
+                setErrorMessage(
+                    serverMessage ||
+                    'This trip no longer exists. Please return to Profile and select a saved trip.'
+                );
+            } else if (e.response?.status === 400) {
+                setErrorMessage(
+                    serverMessage ||
+                    'Please check the expense details and try again.'
+                );
+            } else {
+                setErrorMessage(
+                    serverMessage ||
+                    'Unable to record the expense. Please try again.'
+                );
+            }
+        } finally {
+            setSaving(false);
         }
     };
 
     const handleDelete = async (id) => {
         try {
             const token = sessionStorage.getItem('token');
-            await axios.delete(`${API_BASE}/expenses/${id}`, { headers: { Authorization: `Bearer ${token}` }});
-            fetchExpenses();
+
+            await axios.delete(
+                `${API_BASE}/expenses/${id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+
+            await fetchExpenses(latestTrip?.id);
+            setMessage('Expense removed.');
+
         } catch (e) {
-            console.error(e);
+            console.error('Failed to delete expense:', e);
+            setErrorMessage(
+                e.response?.data?.error ||
+                'Failed to delete expense.'
+            );
         }
     };
 
@@ -111,7 +327,11 @@ const ExpenseTracker = () => {
         Food: Math.round(latestTrip.breakdown?.food || 0),
         Stay: Math.round(latestTrip.breakdown?.stay || 0),
         Transport: Math.round(latestTrip.breakdown?.transport || 0),
-        Activities: Math.round(latestTrip.breakdown?.activities || 0)
+        Activities: Math.round(
+            latestTrip.breakdown?.activities ||
+            latestTrip.breakdown?.experiences ||
+            0
+        )
     } : { Food: 15000, Stay: 20000, Transport: 10000, Activities: 5000 };
 
     const actualData = expenses.reduce((acc, curr) => {
@@ -125,16 +345,42 @@ const ExpenseTracker = () => {
         Actual: actualData[key] || 0
     }));
 
+    const getExchangeRate = () => {
+        const rate = Number(
+            latestTrip?.exchange_rate ??
+            latestTrip?.rate ??
+            1
+        );
+
+        return Number.isFinite(rate) && rate > 0 ? rate : 1;
+    };
+
     const handleInrChange = (e) => {
         const inr = e.target.value;
-        const local = (latestTrip && inr) ? (parseFloat(inr) * Number(latestTrip.exchange_rate)).toFixed(2) : '';
-        setFormData({ ...formData, amount_inr: inr, amount_local: local });
+        const local =
+            (latestTrip && inr)
+                ? (parseFloat(inr) * getExchangeRate()).toFixed(2)
+                : '';
+
+        setFormData({
+            ...formData,
+            amount_inr: inr,
+            amount_local: local
+        });
     };
 
     const handleLocalChange = (e) => {
         const local = e.target.value;
-        const inr = (latestTrip && local) ? (parseFloat(local) / Number(latestTrip.exchange_rate)).toFixed(2) : '';
-        setFormData({ ...formData, amount_inr: inr, amount_local: local });
+        const inr =
+            (latestTrip && local)
+                ? (parseFloat(local) / getExchangeRate()).toFixed(2)
+                : '';
+
+        setFormData({
+            ...formData,
+            amount_inr: inr,
+            amount_local: local
+        });
     };
 
     return (
@@ -146,20 +392,67 @@ const ExpenseTracker = () => {
                     <h2 className="premium-gradient-text" style={{ fontSize: '2.5rem', marginBottom: '1.5rem', fontWeight: '800' }}>
                         Financial Overview
                     </h2>
-                    {latestTrip ? (
+                    {tripLoading ? (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
+                            Loading your selected trip...
+                        </p>
+                    ) : latestTrip ? (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', color: 'var(--text-muted)', fontSize: '1.05rem' }}>
                             <span style={{ background: 'var(--bg-main)', padding: '0.8rem 1.5rem', borderRadius: '1rem', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                Active Plan: <strong style={{ color: 'var(--text-main)' }}>{latestTrip.destination_country}</strong>
+                                Active Plan:
+                                <strong style={{ color: 'var(--text-main)' }}>
+                                    {latestTrip.destination_country || latestTrip.destination}
+                                </strong>
                             </span>
+
                             <span style={{ background: 'rgba(52, 211, 153, 0.12)', padding: '0.8rem 1.5rem', borderRadius: '1rem', border: '1px solid rgba(52, 211, 153, 0.3)', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                Target Budget: <strong style={{ color: 'var(--text-main)' }}>₹{Number(latestTrip.budget_inr).toLocaleString()}</strong>
+                                Target Budget:
+                                <strong style={{ color: 'var(--text-main)' }}>
+                                    ₹{Number(latestTrip.budget_inr || latestTrip.budgetINR || 0).toLocaleString()}
+                                </strong>
                             </span>
+
                             <span style={{ background: 'var(--bg-main)', padding: '0.8rem 1.5rem', borderRadius: '1rem', border: '1px solid var(--glass-border)', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                Local Currency: <strong style={{ color: 'var(--text-main)' }}>{latestTrip.currency_code}</strong> (1 INR = {Number(latestTrip.exchange_rate).toFixed(4)} {latestTrip.currency_code})
+                                Local Currency:
+                                <strong style={{ color: 'var(--text-main)' }}>
+                                    {latestTrip.currency_code || latestTrip.currencyCode || 'INR'}
+                                </strong>
+                                {' '}
+                                (1 INR = {Number(latestTrip.exchange_rate || latestTrip.rate || 1).toFixed(4)} {latestTrip.currency_code || latestTrip.currencyCode || 'INR'})
                             </span>
                         </div>
                     ) : (
-                        <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>No trip planned yet. Showing example budget data.</p>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>
+                            No saved trip selected. Open Profile and choose a trip to track its expenses.
+                        </p>
+                    )}
+
+                    {message && (
+                        <div style={{
+                            marginTop: '1rem',
+                            padding: '0.8rem 1rem',
+                            borderRadius: '0.8rem',
+                            background: 'rgba(16, 185, 129, 0.10)',
+                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                            color: '#10b981',
+                            fontWeight: 700
+                        }}>
+                            {message}
+                        </div>
+                    )}
+
+                    {errorMessage && (
+                        <div style={{
+                            marginTop: '1rem',
+                            padding: '0.8rem 1rem',
+                            borderRadius: '0.8rem',
+                            background: 'rgba(239, 68, 68, 0.10)',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            color: '#ef4444',
+                            fontWeight: 700
+                        }}>
+                            {errorMessage}
+                        </div>
                     )}
                 </div>
             </div>
@@ -187,7 +480,14 @@ const ExpenseTracker = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '2rem' }}>
                 
                 {/* FORM CONTAINER WITH INDIVIDUAL ANIMATED FIELD CARDS */}
-                <form onSubmit={handleAdd} style={{ display: 'grid', gap: '1.25rem' }}>
+                <form
+                    onSubmit={handleAdd}
+                    style={{
+                        display: 'grid',
+                        gap: '1.25rem',
+                        opacity: (!latestTrip || tripLoading) ? 0.72 : 1
+                    }}
+                >
                     <div style={{ marginBottom: '0.5rem' }}>
                         <h3 style={{ fontSize: '1.8rem', color: 'var(--text-main)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                             <Sparkles color="var(--primary)" size={24} /> Record Expense
@@ -307,7 +607,7 @@ const ExpenseTracker = () => {
                             </motion.div>
                             <div>
                                 <label style={{ color: 'var(--text-main)', fontSize: '1rem', fontWeight: '700', display: 'block' }}>
-                                    Local Amount ({latestTrip ? latestTrip.currency_code : 'Currency'})
+                                    Local Amount ({latestTrip ? (latestTrip.currency_code || latestTrip.currencyCode || 'INR') : 'Currency'})
                                 </label>
                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Auto-calculated or manual input</span>
                             </div>
@@ -414,8 +714,21 @@ const ExpenseTracker = () => {
                     </motion.div>
 
                     {/* SUBMIT BUTTON */}
-                    <button type="submit" className="glow-btn" style={{ height: '3.5rem', borderRadius: '1rem', fontSize: '1.1rem', marginTop: '0.5rem' }}>
-                        <Plus size={20} color="#ffffff" /> Record Expense Item
+                    <button
+                        type="submit"
+                        className="glow-btn"
+                        disabled={saving || tripLoading || !latestTrip}
+                        style={{
+                            height: '3.5rem',
+                            borderRadius: '1rem',
+                            fontSize: '1.1rem',
+                            marginTop: '0.5rem',
+                            opacity: (saving || tripLoading || !latestTrip) ? 0.6 : 1,
+                            cursor: (saving || tripLoading || !latestTrip) ? 'not-allowed' : 'pointer'
+                        }}
+                    >
+                        <Plus size={20} color="#ffffff" />
+                        {saving ? ' Saving Expense...' : ' Record Expense Item'}
                     </button>
                 </form>
 
@@ -432,7 +745,9 @@ const ExpenseTracker = () => {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
                                     <div style={{ textAlign: 'right' }}>
                                         <div style={{ fontWeight: '800', fontSize: '1.2rem', color: 'var(--text-main)' }}>₹{exp.amount_inr}</div>
-                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{exp.amount_local} {latestTrip?.currency_code || 'Local'}</div>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                            {exp.amount_local} {latestTrip?.currency_code || latestTrip?.currencyCode || 'Local'}
+                                        </div>
                                     </div>
                                     <button onClick={() => handleDelete(exp.id)} style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'pointer' }}><Trash2 size={18} /></button>
                                 </div>

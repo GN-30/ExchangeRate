@@ -1219,16 +1219,24 @@ const Dashboard = ({ data }) => {
 
 
         .vd-budget-amount {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--vd-text);
+    white-space: nowrap;
+    text-align: right;
+}
 
-            font-size: 0.85rem;
+.vd-budget-local {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #34d399;
+}
 
-            font-weight: 800;
-
-            color:
-                var(--vd-text);
-
-            white-space: nowrap;
-        }
+[data-theme="light"] .vd-budget-local {
+    color: #059669;
+}
 
 
         /* ========================================================
@@ -2874,11 +2882,24 @@ const Dashboard = ({ data }) => {
                                 className="vd-budget-circle-content"
                             >
 
-                                <div
-                                    className="vd-budget-total"
-                                >
-                                    {formatINR(total)}
-                                </div>
+                                <div className="vd-budget-total">
+    {formatINR(total)}
+
+    {currencyCode !== 'INR' && (
+        <div
+            style={{
+                marginTop: '5px',
+                fontSize: '0.78rem',
+                color: '#34d399',
+                fontWeight: 750
+            }}
+        >
+            ≈ {formatLocalCurrency(
+                convertToLocal(total)
+            )}
+        </div>
+    )}
+</div>
 
                                 <div
                                     className="vd-budget-caption"
@@ -2958,13 +2979,21 @@ const Dashboard = ({ data }) => {
                                             </div>
 
 
-                                            <div
-                                                className="vd-budget-amount"
-                                            >
-                                                {formatINR(
-                                                    item.value
-                                                )}
-                                            </div>
+                                            <div className="vd-budget-amount">
+
+    <div>
+        {formatINR(item.value)}
+    </div>
+
+    {currencyCode !== 'INR' && (
+        <div className="vd-budget-local">
+            {formatLocalCurrency(
+                convertToLocal(item.value)
+            )}
+        </div>
+    )}
+
+</div>
 
                                         </div>
 

@@ -3,7 +3,6 @@ import axios from 'axios';
 import {
     Wallet,
     Sparkles,
-    MapPin,
     Calendar,
     Users,
     Compass
@@ -70,14 +69,419 @@ const POPULAR_DESTINATIONS = [
 
 
 // =========================================================
+// ANIMATED TRAIN
+// =========================================================
+
+const AnimatedTrain = () => {
+
+    return (
+
+        <svg
+            className="itinerary-train-border"
+            viewBox="0 0 1000 600"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+        >
+
+            <defs>
+
+                <filter
+                    id="trainGlow"
+                    x="-100%"
+                    y="-100%"
+                    width="300%"
+                    height="300%"
+                >
+
+                    <feGaussianBlur
+                        stdDeviation="1.8"
+                        result="blur"
+                    />
+
+                    <feMerge>
+
+                        <feMergeNode in="blur" />
+
+                        <feMergeNode in="SourceGraphic" />
+
+                    </feMerge>
+
+                </filter>
+
+            </defs>
+
+
+            {/* =====================================================
+                RAILWAY
+               ===================================================== */}
+
+            <path
+                d="
+                    M 150 28
+                    H 850
+                    A 122 122 0 0 1 972 150
+                    V 450
+                    A 122 122 0 0 1 850 572
+                    H 150
+                    A 122 122 0 0 1 28 450
+                    V 150
+                    A 122 122 0 0 1 150 28
+                "
+                fill="none"
+                stroke="var(--train-rail-dark)"
+                strokeWidth="5"
+            />
+
+
+            <path
+                d="
+                    M 150 35
+                    H 850
+                    A 115 115 0 0 1 965 150
+                    V 450
+                    A 115 115 0 0 1 850 565
+                    H 150
+                    A 115 115 0 0 1 35 450
+                    V 150
+                    A 115 115 0 0 1 150 35
+                "
+                fill="none"
+                stroke="var(--train-rail-light)"
+                strokeWidth="3"
+            />
+
+
+            <path
+                d="
+                    M 150 28
+                    H 850
+                    A 122 122 0 0 1 972 150
+                    V 450
+                    A 122 122 0 0 1 850 572
+                    H 150
+                    A 122 122 0 0 1 28 450
+                    V 150
+                    A 122 122 0 0 1 150 28
+                "
+                fill="none"
+                stroke="var(--train-track-highlight)"
+                strokeWidth="2"
+                strokeDasharray="5 9"
+                opacity="0.8"
+            />
+
+
+            {/* =====================================================
+                RAILWAY SLEEPERS
+               ===================================================== */}
+
+            <g className="railway-sleepers">
+
+                {Array.from({ length: 29 }).map(
+                    (_, index) => (
+
+                        <line
+                            key={`top-${index}`}
+                            x1={75 + index * 30}
+                            y1="14"
+                            x2={75 + index * 30}
+                            y2="42"
+                            stroke="var(--train-sleeper)"
+                            strokeWidth="5"
+                            strokeLinecap="round"
+                        />
+
+                    )
+                )}
+
+
+                {Array.from({ length: 29 }).map(
+                    (_, index) => (
+
+                        <line
+                            key={`bottom-${index}`}
+                            x1={75 + index * 30}
+                            y1="558"
+                            x2={75 + index * 30}
+                            y2="586"
+                            stroke="var(--train-sleeper)"
+                            strokeWidth="5"
+                            strokeLinecap="round"
+                        />
+
+                    )
+                )}
+
+
+                {Array.from({ length: 17 }).map(
+                    (_, index) => (
+
+                        <line
+                            key={`left-${index}`}
+                            x1="14"
+                            y1={75 + index * 28}
+                            x2="42"
+                            y2={75 + index * 28}
+                            stroke="var(--train-sleeper)"
+                            strokeWidth="5"
+                            strokeLinecap="round"
+                        />
+
+                    )
+                )}
+
+
+                {Array.from({ length: 17 }).map(
+                    (_, index) => (
+
+                        <line
+                            key={`right-${index}`}
+                            x1="958"
+                            y1={75 + index * 28}
+                            x2="986"
+                            y2={75 + index * 28}
+                            stroke="var(--train-sleeper)"
+                            strokeWidth="5"
+                            strokeLinecap="round"
+                        />
+
+                    )
+                )}
+
+            </g>
+
+
+            {/* =====================================================
+                TRAIN PATH
+               ===================================================== */}
+
+            <path
+                id="trainPath"
+                d="
+                    M 150 28
+                    H 850
+                    A 122 122 0 0 1 972 150
+                    V 450
+                    A 122 122 0 0 1 850 572
+                    H 150
+                    A 122 122 0 0 1 28 450
+                    V 150
+                    A 122 122 0 0 1 150 28
+                "
+                fill="none"
+                stroke="transparent"
+            />
+
+
+            {/* =====================================================
+                SINGLE STEAM ENGINE
+               ===================================================== */}
+
+            <g filter="url(#trainGlow)">
+
+                <g className="border-train">
+
+                    {/* Smoke */}
+
+                    <g className="train-smoke">
+
+                        <circle
+                            cx="-18"
+                            cy="-49"
+                            r="7"
+                            fill="var(--train-smoke)"
+                            opacity="0.85"
+                        />
+
+                        <circle
+                            cx="-10"
+                            cy="-61"
+                            r="6"
+                            fill="var(--train-smoke)"
+                            opacity="0.68"
+                        />
+
+                        <circle
+                            cx="1"
+                            cy="-72"
+                            r="5"
+                            fill="var(--train-smoke)"
+                            opacity="0.52"
+                        />
+
+                        <circle
+                            cx="8"
+                            cy="-81"
+                            r="3.5"
+                            fill="var(--train-smoke)"
+                            opacity="0.35"
+                        />
+
+                    </g>
+
+
+                    {/* Engine body */}
+
+                    <rect
+                        x="-40"
+                        y="-12"
+                        width="72"
+                        height="29"
+                        rx="7"
+                        fill="var(--train-engine)"
+                    />
+
+
+                    {/* Cabin */}
+
+                    <rect
+                        x="-27"
+                        y="-40"
+                        width="32"
+                        height="30"
+                        rx="5"
+                        fill="var(--train-engine-cabin)"
+                    />
+
+
+                    {/* Window */}
+
+                    <rect
+                        x="-20"
+                        y="-34"
+                        width="18"
+                        height="13"
+                        rx="2.5"
+                        fill="var(--train-window)"
+                    />
+
+
+                    {/* Single chimney */}
+
+                    <rect
+                        x="-14"
+                        y="-59"
+                        width="10"
+                        height="20"
+                        rx="3"
+                        fill="var(--train-chimney)"
+                    />
+
+                    <rect
+                        x="-18"
+                        y="-63"
+                        width="18"
+                        height="5"
+                        rx="2"
+                        fill="var(--train-chimney)"
+                    />
+
+
+                    {/* Front */}
+
+                    <rect
+                        x="30"
+                        y="-7"
+                        width="9"
+                        height="20"
+                        rx="3"
+                        fill="var(--train-engine-front)"
+                    />
+
+
+                    <circle
+                        cx="42"
+                        cy="0"
+                        r="5"
+                        fill="var(--train-headlight)"
+                    />
+
+
+                    {/* Front bumper */}
+
+                    <rect
+                        x="37"
+                        y="9"
+                        width="8"
+                        height="5"
+                        rx="2"
+                        fill="var(--train-front-bar)"
+                    />
+
+
+                    {/* Wheels */}
+
+                    <circle
+                        cx="-24"
+                        cy="19"
+                        r="9"
+                        fill="var(--train-wheel)"
+                    />
+
+                    <circle
+                        cx="7"
+                        cy="19"
+                        r="9"
+                        fill="var(--train-wheel)"
+                    />
+
+
+                    <circle
+                        cx="-24"
+                        cy="19"
+                        r="3.5"
+                        fill="var(--train-wheel-center)"
+                    />
+
+                    <circle
+                        cx="7"
+                        cy="19"
+                        r="3.5"
+                        fill="var(--train-wheel-center)"
+                    />
+
+
+                    {/* Coupler */}
+
+                    <rect
+                        x="40"
+                        y="-2"
+                        width="9"
+                        height="5"
+                        rx="2"
+                        fill="var(--train-coupler)"
+                    />
+
+
+                    {/* Smooth continuous movement */}
+
+                    <animateMotion
+                        dur="11s"
+                        repeatCount="indefinite"
+                        rotate="auto"
+                        calcMode="linear"
+                    >
+
+                        <mpath href="#trainPath" />
+
+                    </animateMotion>
+
+                </g>
+
+            </g>
+
+        </svg>
+
+    );
+
+};
+
+
+// =========================================================
 // PLAN TRIP
 // =========================================================
 
 const PlanTrip = () => {
-
-    // =====================================================
-    // STATE
-    // =====================================================
 
     const [result, setResult] =
         useState(null);
@@ -111,11 +515,17 @@ const PlanTrip = () => {
     // =====================================================
 
     const [formData, setFormData] = useState({
+
         destination: '',
+
         days: 3,
+
         budgetINR: 30000,
+
         budget: 'Medium',
+
         travelType: 'Couple'
+
     });
 
 
@@ -123,17 +533,20 @@ const PlanTrip = () => {
     // UPDATE FORM
     // =====================================================
 
-    const updateForm = (
-        field,
-        value
-    ) => {
+    const updateForm =
+        (
+            field,
+            value
+        ) => {
 
-        setFormData(prev => ({
-            ...prev,
-            [field]: value
-        }));
+            setFormData(
+                prev => ({
+                    ...prev,
+                    [field]: value
+                })
+            );
 
-    };
+        };
 
 
     // =====================================================
@@ -146,23 +559,22 @@ const PlanTrip = () => {
             const value =
                 e.target.value;
 
+
             updateForm(
                 'destination',
                 value
             );
 
-            setShowSuggestions(true);
+
+            setShowSuggestions(
+                true
+            );
 
         };
 
 
     // =====================================================
     // LOCATION SEARCH
-    //
-    // We keep the local popular destinations so the
-    // dropdown appears immediately.
-    //
-    // The backend search is then used for actual locations.
     // =====================================================
 
     useEffect(() => {
@@ -171,26 +583,20 @@ const PlanTrip = () => {
             formData.destination.trim();
 
 
-        // -------------------------------------------------
-        // Empty search
-        // -------------------------------------------------
-
         if (!query) {
 
             setSuggestions(
                 POPULAR_DESTINATIONS
             );
 
-            setSearchLoading(false);
+            setSearchLoading(
+                false
+            );
 
             return;
 
         }
 
-
-        // -------------------------------------------------
-        // Local matches
-        // -------------------------------------------------
 
         const localMatches =
             POPULAR_DESTINATIONS.filter(
@@ -209,32 +615,28 @@ const PlanTrip = () => {
             );
 
 
-        // Show local matches immediately
-
         setSuggestions(
             localMatches
         );
 
 
-        // -------------------------------------------------
-        // Don't call API for very short text
-        // -------------------------------------------------
+        if (
+            query.length < 3
+        ) {
 
-        if (query.length < 3) {
-
-            setSearchLoading(false);
+            setSearchLoading(
+                false
+            );
 
             return;
 
         }
 
 
-        setSearchLoading(true);
+        setSearchLoading(
+            true
+        );
 
-
-        // -------------------------------------------------
-        // Debounce API call
-        // -------------------------------------------------
 
         const timer =
             setTimeout(
@@ -252,7 +654,8 @@ const PlanTrip = () => {
                             await axios.get(
                                 `${API_BASE}/search?q=${encodeURIComponent(query)}`,
                                 {
-                                    timeout: 15000
+                                    timeout:
+                                        15000
                                 }
                             );
 
@@ -261,32 +664,58 @@ const PlanTrip = () => {
                             Array.isArray(
                                 response.data
                             )
-                        ) {
+                        ){
 
                             const apiItems =
-                                response.data.map(
-                                    item => ({
-                                        name:
-                                            item.name ||
-                                            (
-                                                item.display_name
-                                                    ? item.display_name
-                                                        .split(',')[0]
-                                                    : ''
-                                            ),
+                                response.data
+                                    .map(
+                                        item => {
 
-                                        display_name:
-                                            item.display_name ||
-                                            item.name ||
-                                            ''
-                                    })
-                                );
+                                            /*
+                                             * Exact place name.
+                                             *
+                                             * Example:
+                                             *
+                                             * name:
+                                             * Nainital
+                                             *
+                                             * display_name:
+                                             * Nainital,
+                                             * Uttarakhand,
+                                             * India
+                                             */
+
+                                            const placeName =
+                                                String(
+                                                    item.name ||
+                                                    (
+                                                        item.display_name
+                                                            ? item.display_name
+                                                                .split(',')[0]
+                                                            : ''
+                                                    ) ||
+                                                    ''
+                                                ).trim();
 
 
-                            // ------------------------------------------------
-                            // Merge API results + local results
-                            // Remove duplicates
-                            // ------------------------------------------------
+                                            return {
+
+                                                name:
+                                                    placeName,
+
+                                                display_name:
+                                                    item.display_name ||
+                                                    placeName
+
+                                            };
+
+                                        }
+                                    )
+                                    .filter(
+                                        item =>
+                                            item.name
+                                    );
+
 
                             const merged = [];
 
@@ -302,8 +731,8 @@ const PlanTrip = () => {
 
                                     const key =
                                         (
-                                            item.display_name ||
                                             item.name ||
+                                            item.display_name ||
                                             ''
                                         )
                                             .toLowerCase()
@@ -314,13 +743,20 @@ const PlanTrip = () => {
                                         !key ||
                                         seen.has(key)
                                     ) {
+
                                         return;
+
                                     }
 
 
-                                    seen.add(key);
+                                    seen.add(
+                                        key
+                                    );
 
-                                    merged.push(item);
+
+                                    merged.push(
+                                        item
+                                    );
 
                                 }
                             );
@@ -340,12 +776,6 @@ const PlanTrip = () => {
                         );
 
 
-                        // ------------------------------------------------
-                        // Important:
-                        // If API fails / rate limits, local matches
-                        // remain visible.
-                        // ------------------------------------------------
-
                         setSuggestions(
                             localMatches
                         );
@@ -363,10 +793,10 @@ const PlanTrip = () => {
             );
 
 
-        // Cleanup debounce
-
         return () =>
-            clearTimeout(timer);
+            clearTimeout(
+                timer
+            );
 
     }, [
         formData.destination
@@ -381,27 +811,54 @@ const PlanTrip = () => {
         (place) => {
 
             if (!place) {
+
                 return;
+
             }
 
 
-            // Use full location name rather than only city.
-            // This is important for Nainital, India etc.
+            /*
+             * IMPORTANT:
+             *
+             * Always use `name` as the actual destination.
+             *
+             * Do NOT use display_name here.
+             *
+             * Example:
+             *
+             * name:
+             * Nainital
+             *
+             * display_name:
+             * Nainital, Uttarakhand, India
+             *
+             * Saved value:
+             * Nainital
+             */
 
             const placeName =
-                place.display_name ||
-                place.name ||
-                '';
+                String(
+                    place.name ||
+                    ''
+                ).trim();
 
 
             if (!placeName) {
+
                 return;
+
             }
 
 
             console.log(
-                '[PlanTrip] Selected location:',
+                '[PlanTrip] Selected PLACE:',
                 placeName
+            );
+
+
+            console.log(
+                '[PlanTrip] Full location:',
+                place.display_name
             );
 
 
@@ -415,13 +872,14 @@ const PlanTrip = () => {
                 false
             );
 
+
             setSuggestions([]);
 
         };
 
 
     // =====================================================
-    // CLICK OUTSIDE DESTINATION
+    // CLICK OUTSIDE
     // =====================================================
 
     useEffect(() => {
@@ -485,7 +943,8 @@ const PlanTrip = () => {
 
             const numericBudget =
                 Number(
-                    formData.budgetINR || 30000
+                    formData.budgetINR ||
+                    30000
                 );
 
 
@@ -503,20 +962,49 @@ const PlanTrip = () => {
             }
 
 
-            setLoading(true);
+            setLoading(
+                true
+            );
 
-            setError(null);
+            setError(
+                null
+            );
 
-            setShowSuggestions(false);
+            setShowSuggestions(
+                false
+            );
+
+
+            /*
+             * IMPORTANT:
+             *
+             * This is the exact place that will
+             * be sent to the backend.
+             *
+             * Example:
+             *
+             * Nainital
+             *
+             * NOT:
+             *
+             * India
+             */
+
+            const destinationToSend =
+                String(
+                    formData.destination
+                ).trim();
 
 
             const payload = {
 
                 destination:
-                    formData.destination,
+                    destinationToSend,
 
                 days:
-                    Number(formData.days),
+                    Number(
+                        formData.days
+                    ),
 
                 budgetINR:
                     numericBudget,
@@ -531,13 +1019,19 @@ const PlanTrip = () => {
             };
 
 
+            console.log(
+                '[PlanTrip] EXACT DESTINATION BEING SENT:',
+                destinationToSend
+            );
+
+
+            console.log(
+                '[PlanTrip] Sending payload:',
+                payload
+            );
+
+
             try {
-
-                console.log(
-                    '[PlanTrip] Sending payload:',
-                    payload
-                );
-
 
                 const token =
                     sessionStorage.getItem(
@@ -547,19 +1041,28 @@ const PlanTrip = () => {
 
                 const response =
                     await axios.post(
+
                         `${API_BASE}/calculate`,
+
                         payload,
+
                         {
+
                             headers: {
+
                                 Authorization:
                                     `Bearer ${token}`,
 
                                 'Content-Type':
                                     'application/json'
+
                             },
 
-                            timeout: 120000
+                            timeout:
+                                120000
+
                         }
+
                     );
 
 
@@ -600,42 +1103,97 @@ const PlanTrip = () => {
                 // STORE LATEST TRIP
                 // =================================================
 
+                /*
+                 * IMPORTANT FIX:
+                 *
+                 * Previously:
+                 *
+                 * destination_country:
+                 * response.data.country
+                 *
+                 * which caused:
+                 *
+                 * India
+                 *
+                 * to be stored.
+                 *
+                 * Now the actual destination is used.
+                 */
+
+                const actualDestination =
+                    String(
+                        response.data.destination ||
+                        destinationToSend
+                    ).trim();
+
+
                 const tripForStorage = {
 
                     id:
                         response.data.id ||
                         null,
 
+
+                    /*
+                     * PLACE
+                     *
+                     * Nainital
+                     */
+
                     destination_country:
-                        response.data.country ||
-                        response.data.destination,
+                        actualDestination,
+
+
+                    /*
+                     * PLACE
+                     */
 
                     destination:
-                        response.data.destination,
+                        actualDestination,
+
+
+                    /*
+                     * COUNTRY
+                     *
+                     * India
+                     */
+
+                    country:
+                        response.data.country ||
+                        '',
+
 
                     days:
                         response.data.days,
 
+
                     budget_inr:
                         response.data.budgetINR,
+
 
                     currency_code:
                         response.data.currencyCode,
 
+
                     currency_symbol:
                         response.data.currencySymbol,
+
 
                     exchange_rate:
                         response.data.rate,
 
+
                     travel_type:
                         response.data.travelType,
+
 
                     breakdown:
                         response.data.breakdown,
 
+
                     itinerary:
                         response.data.itinerary,
+
 
                     landmarks:
                         response.data.landmarks
@@ -643,13 +1201,32 @@ const PlanTrip = () => {
                 };
 
 
-                sessionStorage.setItem(
-                    'voyage_latest_trip',
-                    JSON.stringify(
-                        tripForStorage
-                    )
+                console.log(
+                    '[PlanTrip] Trip stored for profile:',
+                    tripForStorage
                 );
 
+
+                /*
+                 * Notify Profile / other components
+                 */
+
+                window.dispatchEvent(
+
+                    new CustomEvent(
+                        'voyage-trip-created',
+                        {
+                            detail:
+                                tripForStorage
+                        }
+                    )
+
+                );
+
+
+                /*
+                 * Save active trip ID
+                 */
 
                 if (
                     response.data.id
@@ -661,6 +1238,7 @@ const PlanTrip = () => {
                     );
 
                 }
+
 
             } catch (err) {
 
@@ -674,7 +1252,9 @@ const PlanTrip = () => {
                     'Failed to generate itinerary.';
 
 
-                if (err.response) {
+                if (
+                    err.response
+                ) {
 
                     if (
                         err.response.data?.error
@@ -739,21 +1319,38 @@ const PlanTrip = () => {
     const handleNewTrip =
         () => {
 
-            setResult(null);
+            setResult(
+                null
+            );
 
-            setError(null);
+            setError(
+                null
+            );
 
             setFormData({
-                destination: '',
-                days: 3,
-                budgetINR: 30000,
-                budget: 'Medium',
-                travelType: 'Couple'
+
+                destination:
+                    '',
+
+                days:
+                    3,
+
+                budgetINR:
+                    30000,
+
+                budget:
+                    'Medium',
+
+                travelType:
+                    'Couple'
+
             });
+
 
             setSuggestions(
                 POPULAR_DESTINATIONS
             );
+
 
             setShowSuggestions(
                 false
@@ -774,10 +1371,17 @@ const PlanTrip = () => {
 
             <div
                 style={{
-                    display: 'flex',
-                    gap: '0.8rem',
-                    flexWrap: 'wrap',
-                    marginTop: '1rem'
+                    display:
+                        'flex',
+
+                    gap:
+                        '0.8rem',
+
+                    flexWrap:
+                        'wrap',
+
+                    marginTop:
+                        '1rem'
                 }}
             >
 
@@ -792,7 +1396,10 @@ const PlanTrip = () => {
                         return (
 
                             <button
-                                key={option}
+                                key={
+                                    option
+                                }
+
                                 type="button"
 
                                 onClick={() =>
@@ -842,10 +1449,13 @@ const PlanTrip = () => {
                                         isSelected
                                             ? '0 4px 15px var(--shadow-glow)'
                                             : 'none'
+
                                 }}
                             >
 
-                                {option}
+                                {
+                                    option
+                                }
 
                             </button>
 
@@ -873,59 +1483,65 @@ const PlanTrip = () => {
                 HEADER
                ================================================= */}
 
-            <header
-                style={{
-                    textAlign:
-                        'center',
+            {!loading && (
 
-                    marginBottom:
-                        '3rem'
-                }}
-            >
-
-                <h2
-                    className="premium-gradient-text"
-
+                <header
                     style={{
-                        fontSize:
-                            '2.75rem',
+                        textAlign:
+                            'center',
 
                         marginBottom:
-                            '1rem',
-
-                        fontWeight:
-                            '800'
+                            '3rem'
                     }}
                 >
-                    Generate New Itinerary
-                </h2>
+
+                    <h2
+                        className="premium-gradient-text"
+
+                        style={{
+                            fontSize:
+                                '2.75rem',
+
+                            marginBottom:
+                                '1rem',
+
+                            fontWeight:
+                                '800'
+                        }}
+                    >
+                        Generate New Itinerary
+                    </h2>
 
 
-                <p
-                    style={{
-                        color:
-                            'var(--text-muted)',
+                    <p
+                        style={{
+                            color:
+                                'var(--text-muted)',
 
-                        maxWidth:
-                            '650px',
+                            maxWidth:
+                                '650px',
 
-                        margin:
-                            '0 auto',
+                            margin:
+                                '0 auto',
 
-                        lineHeight:
-                            '1.6',
+                            lineHeight:
+                                '1.6',
 
-                        fontSize:
-                            '1.1rem'
-                    }}
-                >
-                    Answer a few quick questions to
-                    generate a geographically organized,
-                    AI-powered travel plan tailored just
-                    for you.
-                </p>
+                            fontSize:
+                                '1.1rem'
+                        }}
+                    >
 
-            </header>
+                        Answer a few quick questions to
+                        generate a geographically organized,
+                        AI-powered travel plan tailored just
+                        for you.
+
+                    </p>
+
+                </header>
+
+            )}
 
 
             {/* =================================================
@@ -947,7 +1563,17 @@ const PlanTrip = () => {
                         '0 auto',
 
                     width:
-                        '100%'
+                        '100%',
+
+                    minHeight:
+                        loading
+                            ? 'calc(100vh - 130px)'
+                            : 'auto',
+
+                    alignContent:
+                        loading
+                            ? 'center'
+                            : 'normal'
                 }}
             >
 
@@ -955,7 +1581,10 @@ const PlanTrip = () => {
                     FORM
                    ================================================= */}
 
-                {(!result && !loading) && (
+                {(
+                    !result &&
+                    !loading
+                ) && (
 
                     <div
                         style={{
@@ -971,20 +1600,34 @@ const PlanTrip = () => {
                     >
 
                         {/* =================================================
-                            QUESTION 1 — DESTINATION
+                            DESTINATION
                            ================================================= */}
 
                         <div
                             className="glass-card destination-card"
-    style={{
-        padding: '2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.25rem',
-        position: 'relative',
-        zIndex: 1000,
-        overflow: 'visible'
-    }}
+
+                            style={{
+                                padding:
+                                    '2rem',
+
+                                display:
+                                    'flex',
+
+                                flexDirection:
+                                    'column',
+
+                                gap:
+                                    '1.25rem',
+
+                                position:
+                                    'relative',
+
+                                zIndex:
+                                    1000,
+
+                                overflow:
+                                    'visible'
+                            }}
                         >
 
                             <h3
@@ -1022,13 +1665,12 @@ const PlanTrip = () => {
                             </h3>
 
 
-                            {/* =================================================
-                                DESTINATION INPUT + SIMPLE DROPDOWN
-                               ================================================= */}
-
                             <div
-                                ref={destinationRef}
-                                 className="destination-search-wrapper"
+                                ref={
+                                    destinationRef
+                                }
+
+                                className="destination-search-wrapper"
 
                                 style={{
                                     position:
@@ -1055,13 +1697,11 @@ const PlanTrip = () => {
                                         handleDestinationChange
                                     }
 
-                                    onFocus={() => {
-
+                                    onFocus={() =>
                                         setShowSuggestions(
                                             true
-                                        );
-
-                                    }}
+                                        )
+                                    }
 
                                     autoComplete="off"
 
@@ -1101,10 +1741,6 @@ const PlanTrip = () => {
                                     }}
                                 />
 
-
-                                {/* =================================================
-                                    SIMPLE EXCHANGE-RATE STYLE DROPDOWN
-                                   ================================================= */}
 
                                 {showSuggestions &&
                                     suggestions.length > 0 && (
@@ -1223,8 +1859,10 @@ const PlanTrip = () => {
                                                     }
                                                 >
 
-                                                    {place.display_name ||
-                                                        place.name}
+                                                    {
+                                                        place.display_name ||
+                                                        place.name
+                                                    }
 
                                                 </li>
 
@@ -1237,10 +1875,6 @@ const PlanTrip = () => {
 
                             </div>
 
-
-                            {/* =================================================
-                                SEARCH STATUS
-                               ================================================= */}
 
                             {searchLoading &&
                                 formData.destination.trim().length >= 3 && (
@@ -1257,7 +1891,9 @@ const PlanTrip = () => {
                                             '-0.5rem'
                                     }}
                                 >
+
                                     Searching locations...
+
                                 </div>
 
                             )}
@@ -1266,7 +1902,7 @@ const PlanTrip = () => {
 
 
                         {/* =================================================
-                            QUESTION 2 — DURATION
+                            DAYS
                            ================================================= */}
 
                         <div
@@ -1410,7 +2046,7 @@ const PlanTrip = () => {
 
 
                         {/* =================================================
-                            QUESTION 3 — BUDGET
+                            BUDGET
                            ================================================= */}
 
                         <div
@@ -1480,7 +2116,9 @@ const PlanTrip = () => {
                                             '0.9rem'
                                     }}
                                 >
+
                                     Enter your budget in INR or pick a quick preset tier below
+
                                 </p>
 
                             </div>
@@ -1523,7 +2161,9 @@ const PlanTrip = () => {
                                             '1px solid rgba(16, 185, 129, 0.3)'
                                     }}
                                 >
+
                                     ₹
+
                                 </span>
 
 
@@ -1581,10 +2221,6 @@ const PlanTrip = () => {
                             </div>
 
 
-                            {/* =================================================
-                                BUDGET PRESETS
-                               ================================================= */}
-
                             <div
                                 style={{
                                     display:
@@ -1602,8 +2238,10 @@ const PlanTrip = () => {
                                     {
                                         label:
                                             'Budget (₹15,000)',
+
                                         val:
                                             15000,
+
                                         level:
                                             'Budget'
                                     },
@@ -1611,8 +2249,10 @@ const PlanTrip = () => {
                                     {
                                         label:
                                             'Standard (₹30,000)',
+
                                         val:
                                             30000,
+
                                         level:
                                             'Medium'
                                     },
@@ -1620,8 +2260,10 @@ const PlanTrip = () => {
                                     {
                                         label:
                                             'Premium (₹60,000)',
+
                                         val:
                                             60000,
+
                                         level:
                                             'High'
                                     },
@@ -1629,8 +2271,10 @@ const PlanTrip = () => {
                                     {
                                         label:
                                             'Luxury (₹150,000)',
+
                                         val:
                                             150000,
+
                                         level:
                                             'Luxury'
                                     }
@@ -1709,7 +2353,9 @@ const PlanTrip = () => {
                                                 }}
                                             >
 
-                                                {preset.label}
+                                                {
+                                                    preset.label
+                                                }
 
                                             </button>
 
@@ -1724,7 +2370,7 @@ const PlanTrip = () => {
 
 
                         {/* =================================================
-                            QUESTION 4 — TRAVEL TYPE
+                            TRAVEL TYPE
                            ================================================= */}
 
                         <div
@@ -1815,7 +2461,9 @@ const PlanTrip = () => {
                                 }}
                             >
 
-                                {error}
+                                {
+                                    error
+                                }
 
                             </div>
 
@@ -1888,70 +2536,198 @@ const PlanTrip = () => {
                 {loading && (
 
                     <div
-                        className="glass-card fade-in"
-
-                        style={{
-                            textAlign:
-                                'center',
-
-                            padding:
-                                '3rem 1.5rem'
-                        }}
+                        className="itinerary-loading-card fade-in"
                     >
 
-                        <div
-                            className="spinner"
-
-                            style={{
-                                margin:
-                                    '0 auto 1.5rem auto'
-                            }}
-                        />
-
-                        <div
-                            style={{
-                                fontSize:
-                                    '1.3rem',
-
-                                color:
-                                    'var(--text-main)',
-
-                                fontWeight:
-                                    '700',
-
-                                marginBottom:
-                                    '0.5rem'
-                            }}
-                        >
-                            Designing your perfect trip...
-                        </div>
+                        <AnimatedTrain />
 
 
                         <div
-                            style={{
-                                fontSize:
-                                    '0.95rem',
-
-                                color:
-                                    'var(--text-muted)'
-                            }}
+                            className="loading-card-content"
                         >
 
-                            Analyzing{' '}
+                            <div
+                                className="loading-icon-wrapper"
+                            >
 
-                            {formData.destination}
+                                <span
+                                    className="loading-suitcase"
+                                >
+                                    🧳
+                                </span>
 
-                            {' '}for a{' '}
+                            </div>
 
-                            {formData.days}
 
-                            -day trip with ₹
+                            <h2
+                                className="loading-title"
+                            >
 
-                            {Number(
-                                formData.budgetINR
-                            ).toLocaleString()}
+                                <span>
+                                    Designing
+                                </span>
 
-                            {' '}budget.
+                                {' '}your perfect trip...
+
+                            </h2>
+
+
+                            <p
+                                className="loading-description"
+                            >
+
+                                Our AI travel planner is
+                                crafting the best itinerary
+                                just for you.
+
+                                <br />
+
+                                Please wait a moment.
+
+                            </p>
+
+
+                            <div
+                                className="loading-steps"
+                            >
+
+                                <div
+                                    className="loading-step"
+                                >
+
+                                    <div
+                                        className="loading-step-icon"
+                                    >
+                                        🔎
+                                    </div>
+
+                                    <span>
+                                        Finding best places
+                                    </span>
+
+                                </div>
+
+
+                                <div
+                                    className="loading-dots"
+                                >
+                                    •••••
+                                </div>
+
+
+                                <div
+                                    className="loading-step"
+                                >
+
+                                    <div
+                                        className="loading-step-icon"
+                                    >
+                                        📍
+                                    </div>
+
+                                    <span>
+                                        Planning route
+                                    </span>
+
+                                </div>
+
+
+                                <div
+                                    className="loading-dots"
+                                >
+                                    •••••
+                                </div>
+
+
+                                <div
+                                    className="loading-step"
+                                >
+
+                                    <div
+                                        className="loading-step-icon"
+                                    >
+                                        🛏️
+                                    </div>
+
+                                    <span>
+                                        Adding stays
+                                    </span>
+
+                                </div>
+
+
+                                <div
+                                    className="loading-dots"
+                                >
+                                    •••••
+                                </div>
+
+
+                                <div
+                                    className="loading-step"
+                                >
+
+                                    <div
+                                        className="loading-step-icon"
+                                    >
+                                        💳
+                                    </div>
+
+                                    <span>
+                                        Estimating budget
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                className="loading-destination"
+                            >
+
+                                <Sparkles
+                                    size={18}
+                                />
+
+                                <span>
+
+                                    Creating your{' '}
+
+                                    <strong>
+                                        {formData.days}-day
+                                    </strong>{' '}
+
+                                    journey through{' '}
+
+                                    <strong>
+                                        {formData.destination}
+                                    </strong>
+
+                                </span>
+
+                            </div>
+
+
+                            <div
+                                className="loading-tip"
+                            >
+
+                                <Sparkles
+                                    size={18}
+                                />
+
+                                <span>
+
+                                    <strong>
+                                        Great trips are worth the wait!
+                                    </strong>
+
+                                    {' '}Thanks for your patience.
+
+                                </span>
+
+                            </div>
 
                         </div>
 
@@ -1961,7 +2737,7 @@ const PlanTrip = () => {
 
 
                 {/* =================================================
-                    RESULT STATE
+                    RESULT
                    ================================================= */}
 
                 {result && (
@@ -2031,6 +2807,718 @@ const PlanTrip = () => {
                 )}
 
             </main>
+
+
+            {/* =================================================
+                LOADING CARD CSS
+               ================================================= */}
+
+            <style>
+                {`
+
+                .itinerary-loading-card {
+
+                    --train-engine: #e63946;
+                    --train-engine-cabin: #b91c1c;
+                    --train-engine-front: #991b1b;
+                    --train-front-bar: #7f1d1d;
+                    --train-chimney: #334155;
+                    --train-window: #dff6ff;
+                    --train-headlight: #fff4a3;
+                    --train-wheel: #263238;
+                    --train-wheel-center: #f8fafc;
+                    --train-coupler: #475569;
+                    --train-smoke: #d9dee5;
+
+                    --train-rail-dark: rgba(124, 83, 52, 0.72);
+                    --train-rail-light: rgba(218, 126, 44, 0.92);
+                    --train-sleeper: rgba(217, 132, 52, 0.72);
+                    --train-track-highlight: rgba(255, 183, 77, 0.9);
+
+                    position: relative;
+                    width: 100%;
+                    height: min(500px, calc(100vh - 150px));
+                    min-height: 460px;
+                    max-height: 500px;
+                    box-sizing: border-box;
+                    padding: 4.8rem 2.2rem 2rem;
+                    overflow: hidden;
+                    border-radius: 1.5rem;
+                    border: 1px solid rgba(239, 68, 68, 0.22);
+
+                    background:
+                        radial-gradient(
+                            circle at 50% 0%,
+                            rgba(239, 68, 68, 0.10),
+                            transparent 38%
+                        ),
+                        radial-gradient(
+                            circle at 100% 100%,
+                            rgba(245, 158, 11, 0.08),
+                            transparent 35%
+                        ),
+                        var(--bg-card);
+
+                    box-shadow:
+                        0 25px 70px rgba(15, 23, 42, 0.16),
+                        inset 0 1px 0 rgba(255,255,255,0.35);
+                }
+
+                .itinerary-train-border {
+                    position: absolute;
+                    inset: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    z-index: 1;
+                    overflow: visible;
+                }
+
+                .border-train {
+                    transform-box: fill-box;
+                    transform-origin: center;
+                }
+
+                .railway-sleepers {
+                    filter:
+                        drop-shadow(
+                            0 1px 1px rgba(0,0,0,0.10)
+                        );
+                }
+
+                .train-smoke {
+                    animation:
+                        trainSmoke 1.8s ease-in-out infinite;
+
+                    transform-box:
+                        fill-box;
+
+                    transform-origin:
+                        center bottom;
+                }
+
+                @keyframes trainSmoke {
+
+                    0%,
+                    100% {
+                        opacity:
+                            0.65;
+
+                        transform:
+                            translate(0, 0)
+                            scale(0.9);
+                    }
+
+                    50% {
+                        opacity:
+                            0.95;
+
+                        transform:
+                            translate(5px, -5px)
+                            scale(1.08);
+                    }
+
+                }
+
+                .loading-card-content {
+                    position: relative;
+                    z-index: 5;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    text-align: center;
+                    max-width: 650px;
+                    margin: 0 auto;
+                }
+
+                .loading-icon-wrapper {
+                    width: 62px;
+                    height: 62px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 50%;
+                    margin-bottom: 0.8rem;
+
+                    background:
+                        linear-gradient(
+                            135deg,
+                            rgba(239,68,68,0.14),
+                            rgba(245,158,11,0.12)
+                        );
+
+                    border:
+                        1px solid rgba(239,68,68,0.16);
+
+                    box-shadow:
+                        0 12px 30px rgba(239,68,68,0.10);
+
+                    animation:
+                        suitcaseFloat 2.4s ease-in-out infinite;
+                }
+
+                .loading-suitcase {
+                    font-size:
+                        2rem;
+
+                    filter:
+                        drop-shadow(
+                            0 5px 8px rgba(0,0,0,0.15)
+                        );
+                }
+
+                @keyframes suitcaseFloat {
+
+                    0%,
+                    100% {
+                        transform:
+                            translateY(0)
+                            rotate(-2deg);
+                    }
+
+                    50% {
+                        transform:
+                            translateY(-7px)
+                            rotate(2deg);
+                    }
+
+                }
+
+                .loading-title {
+                    margin:
+                        0 0 0.65rem;
+
+                    font-size:
+                        clamp(1.55rem, 3.4vw, 2.35rem);
+
+                    line-height:
+                        1.2;
+
+                    font-weight:
+                        850;
+
+                    letter-spacing:
+                        -0.04em;
+
+                    color:
+                        var(--text-main);
+                }
+
+                .loading-title span {
+
+                    background:
+                        linear-gradient(
+                            90deg,
+                            #ef4444,
+                            #f97316,
+                            #ef4444
+                        );
+
+                    background-size:
+                        200% auto;
+
+                    -webkit-background-clip:
+                        text;
+
+                    background-clip:
+                        text;
+
+                    -webkit-text-fill-color:
+                        transparent;
+
+                    animation:
+                        titleGradient 3s linear infinite;
+                }
+
+                @keyframes titleGradient {
+
+                    0% {
+                        background-position:
+                            0% center;
+                    }
+
+                    50% {
+                        background-position:
+                            100% center;
+                    }
+
+                    100% {
+                        background-position:
+                            0% center;
+                    }
+
+                }
+
+                .loading-description {
+                    margin:
+                        0;
+
+                    color:
+                        var(--text-muted);
+
+                    font-size:
+                        1.05rem;
+
+                    line-height:
+                        1.7;
+                }
+
+                .loading-steps {
+
+                    width:
+                        100%;
+
+                    margin-top:
+                        1.55rem;
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    gap:
+                        0.45rem;
+                }
+
+                .loading-step {
+
+                    display:
+                        flex;
+
+                    flex-direction:
+                        column;
+
+                    align-items:
+                        center;
+
+                    gap:
+                        0.4rem;
+
+                    min-width:
+                        85px;
+
+                    color:
+                        var(--text-main);
+
+                    font-size:
+                        0.8rem;
+
+                    font-weight:
+                        700;
+                }
+
+                .loading-step-icon {
+
+                    width:
+                        42px;
+
+                    height:
+                        42px;
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    border-radius:
+                        50%;
+
+                    background:
+                        rgba(239,68,68,0.08);
+
+                    border:
+                        1px solid rgba(239,68,68,0.18);
+
+                    font-size:
+                        1.05rem;
+
+                    animation:
+                        stepPulse 2s ease-in-out infinite;
+                }
+
+                .loading-step:nth-child(1)
+                .loading-step-icon {
+                    animation-delay:
+                        0s;
+                }
+
+                .loading-step:nth-child(3)
+                .loading-step-icon {
+                    animation-delay:
+                        0.35s;
+                }
+
+                .loading-step:nth-child(5)
+                .loading-step-icon {
+                    animation-delay:
+                        0.7s;
+                }
+
+                .loading-step:nth-child(7)
+                .loading-step-icon {
+                    animation-delay:
+                        1.05s;
+                }
+
+                @keyframes stepPulse {
+
+                    0%,
+                    100% {
+                        transform:
+                            translateY(0)
+                            scale(1);
+
+                        box-shadow:
+                            0 0 0 rgba(239,68,68,0);
+                    }
+
+                    50% {
+                        transform:
+                            translateY(-4px)
+                            scale(1.05);
+
+                        box-shadow:
+                            0 8px 22px rgba(239,68,68,0.15);
+                    }
+
+                }
+
+                .loading-dots {
+
+                    color:
+                        #ef4444;
+
+                    font-size:
+                        1.1rem;
+
+                    letter-spacing:
+                        0.18rem;
+
+                    margin-bottom:
+                        1.3rem;
+
+                    opacity:
+                        0.75;
+
+                    animation:
+                        dotsPulse 1.5s ease-in-out infinite;
+                }
+
+                @keyframes dotsPulse {
+
+                    0%,
+                    100% {
+                        opacity:
+                            0.3;
+                    }
+
+                    50% {
+                        opacity:
+                            1;
+                    }
+
+                }
+
+                .loading-destination {
+
+                    margin-top:
+                        1.35rem;
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    gap:
+                        0.5rem;
+
+                    padding:
+                        0.6rem 1rem;
+
+                    border-radius:
+                        999px;
+
+                    background:
+                        rgba(239,68,68,0.06);
+
+                    border:
+                        1px solid rgba(239,68,68,0.13);
+
+                    color:
+                        var(--text-muted);
+
+                    font-size:
+                        0.9rem;
+                }
+
+                .loading-destination svg {
+
+                    color:
+                        #ef4444;
+
+                    animation:
+                        sparkleRotate 2s linear infinite;
+                }
+
+                @keyframes sparkleRotate {
+
+                    0% {
+                        transform:
+                            rotate(0deg)
+                            scale(1);
+                    }
+
+                    50% {
+                        transform:
+                            rotate(180deg)
+                            scale(1.15);
+                    }
+
+                    100% {
+                        transform:
+                            rotate(360deg)
+                            scale(1);
+                    }
+
+                }
+
+                .loading-tip {
+
+                    margin-top:
+                        0.9rem;
+
+                    display:
+                        inline-flex;
+
+                    align-items:
+                        center;
+
+                    gap:
+                        0.5rem;
+
+                    padding:
+                        0.7rem 1.1rem;
+
+                    border-radius:
+                        0.9rem;
+
+                    background:
+                        linear-gradient(
+                            90deg,
+                            rgba(239,68,68,0.08),
+                            rgba(249,115,22,0.08)
+                        );
+
+                    border:
+                        1px solid rgba(239,68,68,0.12);
+
+                    color:
+                        var(--text-muted);
+
+                    font-size:
+                        0.9rem;
+                }
+
+                .loading-tip svg {
+                    color:
+                        #ef4444;
+                }
+
+                .loading-tip strong {
+                    color:
+                        var(--text-main);
+                }
+
+                [data-theme="light"]
+                .itinerary-loading-card {
+
+                    --train-rail-dark:
+                        rgba(111, 78, 55, 0.78);
+
+                    --train-rail-light:
+                        rgba(218, 126, 44, 0.96);
+
+                    --train-sleeper:
+                        rgba(196, 108, 38, 0.76);
+
+                    --train-track-highlight:
+                        rgba(239, 139, 44, 0.95);
+
+                    background:
+                        radial-gradient(
+                            circle at 50% 0%,
+                            rgba(239,68,68,0.08),
+                            transparent 40%
+                        ),
+                        radial-gradient(
+                            circle at 100% 100%,
+                            rgba(245,158,11,0.08),
+                            transparent 35%
+                        ),
+                        var(--bg-card);
+
+                    border-color:
+                        rgba(239,68,68,0.22);
+
+                    box-shadow:
+                        0 25px 70px rgba(239,68,68,0.10),
+                        0 5px 20px rgba(15,23,42,0.06);
+                }
+
+                [data-theme="dark"]
+                .itinerary-loading-card {
+
+                    --train-rail-dark:
+                        rgba(248,113,113,0.55);
+
+                    --train-rail-light:
+                        rgba(251,146,60,0.72);
+
+                    --train-sleeper:
+                        rgba(251,146,60,0.58);
+
+                    --train-track-highlight:
+                        rgba(251,191,36,0.62);
+
+                    background:
+                        radial-gradient(
+                            circle at 50% 0%,
+                            rgba(239,68,68,0.13),
+                            transparent 42%
+                        ),
+                        radial-gradient(
+                            circle at 100% 100%,
+                            rgba(124,58,237,0.12),
+                            transparent 40%
+                        ),
+                        var(--bg-card);
+
+                    border-color:
+                        rgba(248,113,113,0.20);
+
+                    box-shadow:
+                        0 25px 80px rgba(0,0,0,0.35),
+                        inset 0 1px 0 rgba(255,255,255,0.04);
+                }
+
+                @media (max-width: 700px) {
+
+                    .itinerary-loading-card {
+
+                        height:
+                            min(
+                                500px,
+                                calc(100vh - 120px)
+                            );
+
+                        min-height:
+                            430px;
+
+                        max-height:
+                            500px;
+
+                        padding:
+                            4.5rem 1.2rem 2rem;
+                    }
+
+                    .loading-steps {
+
+                        display:
+                            grid;
+
+                        grid-template-columns:
+                            repeat(2, 1fr);
+
+                        gap:
+                            1.5rem;
+                    }
+
+                    .loading-dots {
+                        display:
+                            none;
+                    }
+
+                    .loading-step {
+                        min-width:
+                            auto;
+                    }
+
+                    .loading-destination {
+                        text-align:
+                            center;
+                    }
+
+                    .loading-tip {
+                        text-align:
+                            center;
+                    }
+
+                }
+
+                @media (max-width: 430px) {
+
+                    .itinerary-loading-card {
+
+                        height:
+                            min(
+                                500px,
+                                calc(100vh - 100px)
+                            );
+
+                        min-height:
+                            430px;
+
+                        max-height:
+                            500px;
+
+                        padding:
+                            4.2rem 0.8rem 1.5rem;
+                    }
+
+                    .loading-title {
+
+                        font-size:
+                            1.7rem;
+                    }
+
+                    .loading-description {
+
+                        font-size:
+                            0.9rem;
+                    }
+
+                    .loading-step {
+
+                        font-size:
+                            0.72rem;
+                    }
+
+                    .loading-step-icon {
+
+                        width:
+                            44px;
+
+                        height:
+                            44px;
+                    }
+
+                }
+
+                `}
+            </style>
 
         </div>
 
