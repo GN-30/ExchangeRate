@@ -1,7 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
 
-require('dotenv').config();
+dotenv.config();
 
 // ======================================================
 // SERVICES
@@ -47,9 +50,25 @@ const {
 
 const app = express();
 
-app.use(cors());
+app.use(
+    cors({
+        origin: true,
+        credentials: true
+    })
+);
 
-app.use(express.json());
+app.use(
+    express.json({
+        limit: '10mb'
+    })
+);
+
+app.use(
+    express.urlencoded({
+        extended: true,
+        limit: '10mb'
+    })
+);
 
 const PORT =
     process.env.PORT || 5000;
@@ -59,14 +78,17 @@ const PORT =
 // HEALTH CHECK
 // ======================================================
 
-app.get('/api/health', (req, res) => {
+app.get(
+    '/api/health',
+    (req, res) => {
 
-    res.json({
-        status: 'OK',
-        message: 'Server is running'
-    });
+        res.json({
+            status: 'OK',
+            message: 'Server is running'
+        });
 
-});
+    }
+);
 
 
 // ======================================================
@@ -83,49 +105,62 @@ app.get('/api/health', (req, res) => {
 // - 429 retry
 // ======================================================
 
-app.get('/api/search', async (req, res) => {
+app.get(
+    '/api/search',
+    async (req, res) => {
 
-    try {
+        try {
 
-        const query =
-            String(req.query.q || '').trim();
+            const query =
+                String(
+                    req.query.q || ''
+                ).trim();
 
 
-        if (query.length < 3) {
+            if (
+                query.length < 3
+            ) {
 
-            return res.json([]);
+                return res.json([]);
+
+            }
+
+
+            console.log(
+                `[Search] Searching locations for: ${query}`
+            );
+
+
+            const results =
+                await searchLocations(
+                    query
+                );
+
+
+            res.json(
+                results
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                '[Search] Route error:',
+                error.message
+            );
+
+
+            res.status(500).json({
+
+                error:
+                    'Failed to search locations'
+
+            });
 
         }
 
-
-        console.log(
-            `[Search] Searching locations for: ${query}`
-        );
-
-
-        const results =
-            await searchLocations(query);
-
-
-        res.json(results);
-
-
-    } catch (error) {
-
-        console.error(
-            '[Search] Route error:',
-            error.message
-        );
-
-
-        res.status(500).json({
-            error:
-                'Failed to search locations'
-        });
-
     }
-
-});
+);
 
 
 // ======================================================
@@ -154,15 +189,22 @@ app.get(
 
             const result =
                 await db.query(
+
                     `SELECT *
                      FROM trips
                      WHERE user_id = $1
                      ORDER BY created_at DESC
                      LIMIT 50`,
+
                     [req.user.id]
+
                 );
 
-            res.json(result.rows);
+
+            res.json(
+                result.rows
+            );
+
 
         } catch (error) {
 
@@ -171,9 +213,12 @@ app.get(
                 error.message
             );
 
+
             res.status(500).json({
+
                 error:
                     'Failed to fetch history'
+
             });
 
         }
@@ -198,6 +243,7 @@ app.post(
                 password
             } = req.body;
 
+
             const result =
                 await register(
                     name,
@@ -205,13 +251,25 @@ app.post(
                     password
                 );
 
-            res.json(result);
+
+            res.json(
+                result
+            );
+
 
         } catch (err) {
 
+            console.error(
+                'Register error:',
+                err.message
+            );
+
+
             res.status(400).json({
+
                 error:
                     err.message
+
             });
 
         }
@@ -235,19 +293,32 @@ app.post(
                 password
             } = req.body;
 
+
             const result =
                 await login(
                     email,
                     password
                 );
 
-            res.json(result);
+
+            res.json(
+                result
+            );
+
 
         } catch (err) {
 
+            console.error(
+                'Login error:',
+                err.message
+            );
+
+
             res.status(400).json({
+
                 error:
                     err.message
+
             });
 
         }
@@ -269,6 +340,7 @@ app.get(
 
             const result =
                 await db.query(
+
                     `SELECT
                         id,
                         name,
@@ -276,7 +348,9 @@ app.get(
                         preferences
                      FROM users
                      WHERE id = $1`,
+
                     [req.user.id]
+
                 );
 
 
@@ -285,8 +359,10 @@ app.get(
             ) {
 
                 return res.status(404).json({
+
                     error:
                         'User not found'
+
                 });
 
             }
@@ -296,6 +372,7 @@ app.get(
                 result.rows[0]
             );
 
+
         } catch (err) {
 
             console.error(
@@ -303,9 +380,12 @@ app.get(
                 err.message
             );
 
+
             res.status(500).json({
+
                 error:
                     'Server error'
+
             });
 
         }
@@ -316,6 +396,20 @@ app.get(
 
 // ======================================================
 // CHATBOT
+//
+// Supports:
+// - Normal AI travel questions
+// - User trip context
+// - User expense context
+// - Selected response language
+// - Translation mode
+//
+// Frontend sends:
+// {
+//     message: "...",
+//     language: "Tamil",
+//     translate: true
+// }
 // ======================================================
 
 app.post(
@@ -324,56 +418,195 @@ app.post(
 
         try {
 
-            let userId = null;
+            let userId =
+                null;
+
+
+            // ==================================================
+            // GET TOKEN
+            // ==================================================
+
+            const authorization =
+                req.get(
+                    'Authorization'
+                );
 
 
             const token =
-                req
-                    .header('Authorization')
-                    ?.replace(
-                        'Bearer ',
-                        ''
-                    );
+                authorization &&
+                    authorization.startsWith(
+                        'Bearer '
+                    )
+                    ? authorization
+                        .substring(7)
+                        .trim()
+                    : null;
 
 
-            if (token) {
+            // ==================================================
+            // VERIFY TOKEN
+            // ==================================================
+
+            if (
+                token
+            ) {
 
                 try {
 
                     const decoded =
-                        require('jsonwebtoken')
-                            .verify(
-                                token,
-                                process.env.JWT_SECRET ||
-                                'secret_key'
-                            );
+                        jwt.verify(
+
+                            token,
+
+                            process.env.JWT_SECRET ||
+                            'secret_key'
+
+                        );
+
+
+                    /*
+                     * Support different possible
+                     * JWT payload names.
+                     */
 
                     userId =
-                        decoded.id;
+                        decoded.id ||
+                        decoded.userId ||
+                        decoded.user_id ||
+                        null;
 
-                } catch (e) {
 
-                    // Anonymous user
+                } catch (tokenError) {
+
+                    /*
+                     * The chatbot can still work
+                     * for an anonymous user.
+                     */
+
+                    console.warn(
+                        '[Chatbot] Invalid token. Continuing as guest.'
+                    );
+
+                    userId =
+                        null;
 
                 }
 
             }
 
 
+            // ==================================================
+            // REQUEST BODY
+            // ==================================================
+
             const {
-                message
+                message,
+                language,
+                translate
             } = req.body;
 
 
+            // ==================================================
+            // VALIDATE MESSAGE
+            // ==================================================
+
+            if (
+                !message ||
+                typeof message !== 'string' ||
+                !message.trim()
+            ) {
+
+                return res.status(400).json({
+
+                    success:
+                        false,
+
+                    error:
+                        'Please provide a valid message.'
+
+                });
+
+            }
+
+
+            // ==================================================
+            // CHATBOT OPTIONS
+            // ==================================================
+
+            const chatbotOptions = {
+
+                language:
+                    language ||
+                    'English',
+
+                translate:
+                    Boolean(
+                        translate
+                    )
+
+            };
+
+
+            console.log(
+                '----------------------------------------'
+            );
+
+            console.log(
+                '[Chatbot] New message'
+            );
+
+            console.log(
+                '[Chatbot] User:',
+                userId || 'Guest'
+            );
+
+            console.log(
+                '[Chatbot] Language:',
+                chatbotOptions.language
+            );
+
+            console.log(
+                '[Chatbot] Translation:',
+                chatbotOptions.translate
+            );
+
+            console.log(
+                '[Chatbot] Message:',
+                message.trim()
+            );
+
+            console.log(
+                '----------------------------------------'
+            );
+
+
+            // ==================================================
+            // GET AI RESPONSE
+            // ==================================================
+
             const reply =
                 await getChatbotResponse(
-                    message,
-                    userId
+
+                    message.trim(),
+
+                    userId,
+
+                    chatbotOptions
+
                 );
 
 
-            res.json({
+            // ==================================================
+            // RESPONSE
+            // ==================================================
+
+            return res.json({
+
+                success:
+                    true,
+
                 reply
+
             });
 
 
@@ -381,12 +614,19 @@ app.post(
 
             console.error(
                 'Chatbot error:',
+                err.response?.data ||
                 err.message
             );
 
-            res.status(500).json({
+
+            return res.status(500).json({
+
+                success:
+                    false,
+
                 error:
                     'Chatbot error'
+
             });
 
         }
@@ -412,12 +652,15 @@ app.get(
 
                 const result =
                     await db.query(
+
                         `SELECT *
                          FROM trips
                          WHERE user_id = $1
                          ORDER BY created_at DESC
                          LIMIT 1`,
+
                         [req.user.id]
+
                     );
 
 
@@ -425,7 +668,9 @@ app.get(
                     result.rows.length === 0
                 ) {
 
-                    return res.json(null);
+                    return res.json(
+                        null
+                    );
 
                 }
 
@@ -439,14 +684,17 @@ app.get(
 
             const result =
                 await db.query(
+
                     `SELECT *
                      FROM trips
                      WHERE id = $1
                      AND user_id = $2`,
+
                     [
                         req.params.id,
                         req.user.id
                     ]
+
                 );
 
 
@@ -455,8 +703,10 @@ app.get(
             ) {
 
                 return res.status(404).json({
+
                     error:
                         'Trip not found'
+
                 });
 
             }
@@ -474,9 +724,12 @@ app.get(
                 err.message
             );
 
+
             res.status(500).json({
+
                 error:
                     'Failed to fetch trip'
+
             });
 
         }
@@ -512,15 +765,18 @@ app.get(
 
             const result =
                 await db.query(
+
                     `SELECT *
                      FROM expenses
                      WHERE user_id = $1
                      AND trip_id = $2
                      ORDER BY date DESC`,
+
                     [
                         req.user.id,
                         tripId
                     ]
+
                 );
 
 
@@ -536,9 +792,12 @@ app.get(
                 err.message
             );
 
+
             res.status(500).json({
+
                 error:
                     'Failed'
+
             });
 
         }
@@ -568,11 +827,15 @@ app.post(
             } = req.body;
 
 
-            if (!trip_id) {
+            if (
+                !trip_id
+            ) {
 
                 return res.status(400).json({
+
                     error:
                         'trip_id is required'
+
                 });
 
             }
@@ -580,6 +843,7 @@ app.post(
 
             const result =
                 await db.query(
+
                     `INSERT INTO expenses
                     (
                         trip_id,
@@ -601,6 +865,7 @@ app.post(
                         $7
                     )
                     RETURNING *`,
+
                     [
                         trip_id,
                         req.user.id,
@@ -610,6 +875,7 @@ app.post(
                         description,
                         date
                     ]
+
                 );
 
 
@@ -625,9 +891,12 @@ app.post(
                 err.message
             );
 
+
             res.status(500).json({
+
                 error:
                     'Failed'
+
             });
 
         }
@@ -648,19 +917,24 @@ app.delete(
         try {
 
             await db.query(
+
                 `DELETE FROM expenses
                  WHERE id = $1
                  AND user_id = $2`,
+
                 [
                     req.params.id,
                     req.user.id
                 ]
+
             );
 
 
             res.json({
+
                 success:
                     true
+
             });
 
 
@@ -671,9 +945,12 @@ app.delete(
                 err.message
             );
 
+
             res.status(500).json({
+
                 error:
                     'Failed'
+
             });
 
         }
@@ -695,10 +972,13 @@ app.get(
 
             const result =
                 await db.query(
+
                     `SELECT *
                      FROM alerts
                      WHERE user_id = $1`,
+
                     [req.user.id]
+
                 );
 
 
@@ -714,9 +994,12 @@ app.get(
                 err.message
             );
 
+
             res.status(500).json({
+
                 error:
                     'Failed'
+
             });
 
         }
@@ -745,6 +1028,7 @@ app.post(
 
             const result =
                 await db.query(
+
                     `INSERT INTO alerts
                     (
                         user_id,
@@ -760,12 +1044,14 @@ app.post(
                         $4
                     )
                     RETURNING *`,
+
                     [
                         req.user.id,
                         currency_code,
                         target_rate,
                         condition
                     ]
+
                 );
 
 
@@ -781,9 +1067,12 @@ app.post(
                 err.message
             );
 
+
             res.status(500).json({
+
                 error:
                     'Failed'
+
             });
 
         }
@@ -806,13 +1095,20 @@ app.post(
             const {
                 sendAlertEmail
             } =
-                require('./services/emailService');
+                require(
+                    './services/emailService'
+                );
 
 
             await sendAlertEmail(
+
                 req.user.email,
-                req.user.name || 'User',
+
+                req.user.name ||
+                'User',
+
                 {
+
                     currency:
                         'TEST',
 
@@ -824,13 +1120,17 @@ app.post(
 
                     condition:
                         'equal'
+
                 }
+
             );
 
 
             res.json({
+
                 message:
                     `Test email sent to ${req.user.email}`
+
             });
 
 
@@ -843,8 +1143,10 @@ app.post(
 
 
             res.status(500).json({
+
                 error:
                     err.message
+
             });
 
         }
@@ -869,11 +1171,15 @@ app.get(
                 ).trim();
 
 
-            if (!searchTerm) {
+            if (
+                !searchTerm
+            ) {
 
                 return res.status(400).json({
+
                     error:
                         'Currency or country is required'
+
                 });
 
             }
@@ -890,8 +1196,6 @@ app.get(
 
             let currencyCode;
 
-
-            // Direct currency code
 
             if (
                 /^[A-Za-z]{3}$/.test(
@@ -918,8 +1222,10 @@ app.get(
                     ) {
 
                         return res.status(404).json({
+
                             error:
                                 `Could not determine currency for ${searchTerm}`
+
                         });
 
                     }
@@ -944,10 +1250,13 @@ app.get(
 
 
                     return res.status(404).json({
+
                         error:
                             `Could not determine currency for ${searchTerm}`,
+
                         details:
                             error.message
+
                     });
 
                 }
@@ -969,7 +1278,9 @@ app.get(
             ) {
 
                 return res.json([
+
                     {
+
                         date:
                             new Date()
                                 .toLocaleDateString(
@@ -977,6 +1288,7 @@ app.get(
                                     {
                                         month:
                                             'short',
+
                                         day:
                                             'numeric'
                                     }
@@ -990,7 +1302,9 @@ app.get(
 
                         baseCurrency:
                             'INR'
+
                     }
+
                 ]);
 
             }
@@ -1011,7 +1325,9 @@ app.get(
 
 
             const startDateObject =
-                new Date(today);
+                new Date(
+                    today
+                );
 
 
             startDateObject.setDate(
@@ -1040,10 +1356,14 @@ app.get(
             try {
 
                 response =
-                    await require('axios').get(
+                    await axios.get(
+
                         'https://api.frankfurter.dev/v2/rates',
+
                         {
+
                             params: {
+
                                 base:
                                     'INR',
 
@@ -1052,11 +1372,14 @@ app.get(
 
                                 from:
                                     startDate
+
                             },
 
                             timeout:
                                 30000
+
                         }
+
                     );
 
 
@@ -1074,8 +1397,10 @@ app.get(
                 ) {
 
                     return res.status(504).json({
+
                         error:
                             'Historical exchange-rate service timed out. Please try again.'
+
                     });
 
                 }
@@ -1086,24 +1411,31 @@ app.get(
                 ) {
 
                     return res.status(
-                        apiError.response.status || 502
+
+                        apiError.response.status ||
+                        502
+
                     ).json({
+
                         error:
                             'Historical exchange-rate service returned an error',
 
                         details:
                             apiError.response.data
+
                     });
 
                 }
 
 
                 return res.status(502).json({
+
                     error:
                         'Could not connect to historical exchange-rate service',
 
                     details:
                         apiError.message
+
                 });
 
             }
@@ -1130,47 +1462,53 @@ app.get(
             const data =
                 rows
 
-                    .filter(row =>
-                        row &&
-                        typeof row.rate ===
-                        'number'
+                    .filter(
+                        row =>
+                            row &&
+                            typeof row.rate ===
+                            'number'
                     )
 
-                    .map(row => {
+                    .map(
+                        row => {
 
-                        const date =
-                            new Date(
-                                `${row.date}T00:00:00`
-                            );
+                            const date =
+                                new Date(
+                                    `${row.date}T00:00:00`
+                                );
 
 
-                        return {
+                            return {
 
-                            date:
-                                date.toLocaleDateString(
-                                    'en-US',
-                                    {
-                                        month:
-                                            'short',
-                                        day:
-                                            'numeric'
-                                    }
-                                ),
+                                date:
+                                    date.toLocaleDateString(
+                                        'en-US',
+                                        {
+                                            month:
+                                                'short',
 
-                            rate:
-                                Number(
-                                    row.rate.toFixed(6)
-                                ),
+                                            day:
+                                                'numeric'
+                                        }
+                                    ),
 
-                            currency:
-                                currencyCode,
+                                rate:
+                                    Number(
+                                        row.rate.toFixed(
+                                            6
+                                        )
+                                    ),
 
-                            baseCurrency:
-                                'INR'
+                                currency:
+                                    currencyCode,
 
-                        };
+                                baseCurrency:
+                                    'INR'
 
-                    });
+                            };
+
+                        }
+                    );
 
 
             if (
@@ -1198,7 +1536,9 @@ app.get(
             );
 
 
-            res.json(data);
+            res.json(
+                data
+            );
 
 
         } catch (error) {
@@ -1237,6 +1577,19 @@ app.listen(
         console.log(
             `Server running on port ${PORT}`
         );
+
+
+        console.log(
+            `Chatbot endpoint: POST /api/chat`
+        );
+
+
+        console.log(
+            `AI model: ${process.env.OPENAI_MODEL ||
+            'gpt-4o-mini'
+            }`
+        );
+
 
         startAlertWorker();
 
