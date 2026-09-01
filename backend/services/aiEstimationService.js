@@ -1,4 +1,4 @@
-const axios = require('axios');
+const { GoogleGenAI } = require('@google/genai');
 
 require('dotenv').config();
 
@@ -8,66 +8,70 @@ require('dotenv').config();
 // ============================================================
 
 const GEMINI_API_KEY =
-    process.env.GEMINI_API_KEY;
+    (process.env.GEMINI_API_KEY || '').trim();
 
+const PRIMARY_MODEL =
+    process.env.GEMINI_MODEL ||
+    'gemini-3.6-flash';
+
+const FALLBACK_MODELS = [
+    'gemini-3-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3-flash-preview'
+];
 
 const GEMINI_MODELS = [
+    PRIMARY_MODEL,
+    ...FALLBACK_MODELS
+].filter(
+    (model, index, array) =>
+        model &&
+        array.indexOf(model) === index
+);
 
-    'gemini-3.7-flash',
 
-    'gemini-3.6-flash',
+let ai = null;
 
-    'gemini-3.5-flash',
+if (GEMINI_API_KEY) {
 
-    'gemini-2.5-flash',
+    ai = new GoogleGenAI({
+        apiKey: GEMINI_API_KEY
+    });
 
-    'gemini-2.5-flash-lite'
+} else {
 
-];
+    console.warn(
+        '[Gemini] GEMINI_API_KEY is missing'
+    );
+
+}
 
 
 console.log(
     `[Gemini] API Key Present: ${!!GEMINI_API_KEY}`
 );
 
-
-// ============================================================
-// SLEEP
-// ============================================================
-
-const sleep = (
-    milliseconds
-) => {
-
-    return new Promise(
-        resolve =>
-            setTimeout(
-                resolve,
-                milliseconds
-            )
-    );
-};
+console.log(
+    `[Gemini] Primary model: ${PRIMARY_MODEL}`
+);
 
 
 // ============================================================
 // CLEAN JSON
 // ============================================================
 
-const cleanJson = (
-    text
-) => {
+const cleanJson = (text) => {
 
     if (!text) {
 
         throw new Error(
             'Gemini returned an empty response'
         );
+
     }
 
-
     let cleaned =
-        text.trim();
-
+        String(text).trim();
 
     cleaned =
         cleaned.replace(
@@ -75,13 +79,11 @@ const cleanJson = (
             ''
         );
 
-
     cleaned =
         cleaned.replace(
             /^```\s*/i,
             ''
         );
-
 
     cleaned =
         cleaned.replace(
@@ -90,42 +92,59 @@ const cleanJson = (
         );
 
 
+    const firstBrace =
+        cleaned.indexOf('{');
+
+    const lastBrace =
+        cleaned.lastIndexOf('}');
+
+
+    if (
+        firstBrace !== -1 &&
+        lastBrace !== -1 &&
+        lastBrace > firstBrace
+    ) {
+
+        cleaned =
+            cleaned.substring(
+                firstBrace,
+                lastBrace + 1
+            );
+
+    }
+
+
     return cleaned.trim();
+
 };
 
 
 // ============================================================
-// NORMALIZE PLACE NAME
+// NORMALIZE PLACE
 // ============================================================
 
 const normalizePlaceName = (
     name
 ) => {
 
-    if (
-        !name ||
-        typeof name !== 'string'
-    ) {
-
-        return '';
-    }
-
-
-    return name
+    return String(
+        name || ''
+    )
         .trim()
         .replace(
             /\s+/g,
             ' '
         )
         .toLowerCase();
+
 };
 
 
 // ============================================================
-// CHECK WHETHER A PLACE NAME IS AN INTERNAL ID
+// INVALID PLACE CHECK
 // ============================================================
 
-const isInternalPlaceId = (
+const isInvalidPlaceName = (
     name
 ) => {
 
@@ -135,6 +154,7 @@ const isInternalPlaceId = (
     ) {
 
         return true;
+
     }
 
 
@@ -142,54 +162,31 @@ const isInternalPlaceId = (
         name.trim();
 
 
-    /*
-     * Examples rejected:
-     *
-     * MDR32
-     * MDR-32
-     * POI123
-     * POI-123
-     * LOC45
-     * REF12
-     * ID123
-     * PLACE42
-     */
+    if (
+        value.length < 3
+    ) {
 
-    const internalIdPattern =
-        /^(?:MDR|POI|LOC|REF|ID|PLACE|LANDMARK|ATTRACTION)[-_]?\d+$/i;
+        return true;
+
+    }
+
+
+    // Roads / internal IDs
+
+    const invalidPattern =
+        /^(?:MDR|NH|SH|MH|MP|UP|RJ|DL|KA|TN|KL|AP|TS|GJ|HR|PB|BR|WB|OD|JH|CG|UK|HP|JK|GA|AS|POI|LOC|REF|ID|PLACE|LANDMARK)[-_]?\d+$/i;
 
 
     if (
-        internalIdPattern.test(
+        invalidPattern.test(
             value
         )
     ) {
 
         return true;
+
     }
 
-
-    /*
-     * Generic uppercase/lowercase code:
-     *
-     * ABC123
-     * XYZ45
-     */
-
-    if (
-        /^[A-Z]{2,12}[-_]?\d{1,8}$/i.test(
-            value
-        )
-    ) {
-
-        return true;
-    }
-
-
-    /*
-     * Pure numbers are never useful
-     * as landmark names.
-     */
 
     if (
         /^\d+$/.test(
@@ -198,366 +195,298 @@ const isInternalPlaceId = (
     ) {
 
         return true;
+
     }
 
 
     return false;
+
 };
 
 
 // ============================================================
-// VALIDATE REAL LANDMARK
+// CLEAN PLACES
 // ============================================================
 
-const isValidLandmarkObject = (
-    place
+const cleanPlaces = (
+    places
 ) => {
 
     if (
-        !place ||
-        typeof place !== 'object'
-    ) {
-
-        return false;
-    }
-
-
-    const name =
-        typeof place.name === 'string'
-            ? place.name.trim()
-            : '';
-
-
-    if (!name) {
-
-        return false;
-    }
-
-
-    if (
-        isInternalPlaceId(
-            name
-        )
-    ) {
-
-        return false;
-    }
-
-
-    /*
-     * Very short values are usually
-     * not useful landmark names.
-     */
-
-    if (
-        name.length < 3
-    ) {
-
-        return false;
-    }
-
-
-    return true;
-};
-
-
-// ============================================================
-// CLEAN REAL LANDMARKS
-// ============================================================
-
-const cleanRealLandmarks = (
-    groupedLandmarks
-) => {
-
-    if (
-        !Array.isArray(
-            groupedLandmarks
-        )
+        !Array.isArray(places)
     ) {
 
         return [];
+
     }
 
 
-    return groupedLandmarks.map(
-        dayPlaces => {
+    const result = [];
 
-            if (
-                !Array.isArray(
-                    dayPlaces
-                )
-            ) {
-
-                return [];
-            }
+    const seen =
+        new Set();
 
 
-            return dayPlaces
-                .filter(
-                    isValidLandmarkObject
-                )
-                .map(
-                    place => ({
+    for (
+        const place of places
+    ) {
 
-                        ...place,
+        if (
+            !place
+        ) {
 
-                        name:
-                            place.name.trim()
+            continue;
 
-                    })
-                );
         }
-    );
+
+
+        const name =
+            String(
+                place.name ||
+                ''
+            ).trim();
+
+
+        if (
+            isInvalidPlaceName(
+                name
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        const key =
+            normalizePlaceName(
+                name
+            );
+
+
+        if (
+            seen.has(
+                key
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        seen.add(
+            key
+        );
+
+
+        result.push({
+
+            name,
+
+            importance:
+                place.importance ||
+                'important',
+
+            category:
+                place.category ||
+                'attraction',
+
+            description:
+                place.description ||
+                '',
+
+            whyVisit:
+                place.whyVisit ||
+                '',
+
+            recommendedDuration:
+                place.recommendedDuration ||
+                '1-2 hours'
+
+        });
+
+    }
+
+
+    return result;
+
 };
 
 
 // ============================================================
-// FIND REAL LANDMARK
+// GEMINI ERROR HELPERS
 // ============================================================
 
-const findMatchingRealPlace = (
-    generatedPlace,
-    realPlaces
+const getErrorStatus = (
+    error
 ) => {
 
-    if (
-        !generatedPlace ||
-        !Array.isArray(
-            realPlaces
-        )
-    ) {
+    return (
+        error?.status ||
+        error?.response?.status ||
+        null
+    );
 
-        return null;
-    }
-
-
-    if (
-        isInternalPlaceId(
-            generatedPlace
-        )
-    ) {
-
-        return null;
-    }
-
-
-    const generated =
-        normalizePlaceName(
-            generatedPlace
-        );
-
-
-    if (!generated) {
-
-        return null;
-    }
-
-
-    /*
-     * 1. Exact match
-     */
-
-    let match =
-        realPlaces.find(
-            place =>
-                normalizePlaceName(
-                    place.name
-                ) === generated
-        );
-
-
-    if (match) {
-
-        return match;
-    }
-
-
-    /*
-     * 2. Generated name contains
-     *    real landmark name
-     */
-
-    match =
-        realPlaces.find(
-            place => {
-
-                const realName =
-                    normalizePlaceName(
-                        place.name
-                    );
-
-
-                return (
-                    generated.includes(
-                        realName
-                    ) &&
-                    realName.length >= 4
-                );
-            }
-        );
-
-
-    if (match) {
-
-        return match;
-    }
-
-
-    /*
-     * 3. Real landmark contains
-     *    generated name
-     */
-
-    match =
-        realPlaces.find(
-            place => {
-
-                const realName =
-                    normalizePlaceName(
-                        place.name
-                    );
-
-
-                return (
-                    realName.includes(
-                        generated
-                    ) &&
-                    generated.length >= 4
-                );
-            }
-        );
-
-
-    if (match) {
-
-        return match;
-    }
-
-
-    return null;
 };
 
 
-// ============================================================
-// VALIDATE GENERATED PLACE
-// ============================================================
-
-const isValidGeneratedPlace = (
-    generatedPlace,
-    realPlaces
+const isModelError = (
+    error
 ) => {
 
-    return Boolean(
-        findMatchingRealPlace(
-            generatedPlace,
-            realPlaces
+    const status =
+        getErrorStatus(
+            error
+        );
+
+
+    const message =
+        String(
+            error?.message ||
+            ''
+        ).toLowerCase();
+
+
+    return (
+
+        status === 404 ||
+
+        message.includes(
+            'model not found'
+        ) ||
+
+        message.includes(
+            'not available'
         )
+
     );
+
 };
 
 
 // ============================================================
-// GEMINI REQUEST
+// GEMINI CALL
 // ============================================================
 
-const generateGeminiContent = async (
+const callGemini = async ({
+    model,
+    systemInstruction,
     prompt
-) => {
+}) => {
 
-    if (!GEMINI_API_KEY) {
+    if (
+        !ai
+    ) {
 
         throw new Error(
-            'GEMINI_API_KEY is missing'
+            'GEMINI_API_KEY is not configured'
         );
+
     }
 
 
-    let lastError = null;
+    console.log(
+        `[Gemini] Calling ${model}`
+    );
+
+
+    const response =
+        await ai.models.generateContent({
+
+            model,
+
+            contents:
+                prompt,
+
+            config: {
+
+                systemInstruction,
+
+                temperature:
+                    0.15,
+
+                responseMimeType:
+                    'application/json',
+
+                maxOutputTokens:
+                    6000
+
+            }
+
+        });
+
+
+    const text =
+        response?.text ||
+        response
+            ?.candidates?.[0]
+            ?.content?.parts?.[0]
+            ?.text ||
+        '';
+
+
+    if (
+        !text.trim()
+    ) {
+
+        throw new Error(
+            'Gemini returned an empty response'
+        );
+
+    }
+
+
+    return text.trim();
+
+};
+
+
+// ============================================================
+// GEMINI WITH FALLBACK
+// ============================================================
+
+const generateGeminiJson = async ({
+    systemInstruction,
+    prompt
+}) => {
+
+    let lastError =
+        null;
 
 
     for (
         const model of GEMINI_MODELS
     ) {
 
-        console.log(
-            `\n[Gemini] Trying model: ${model}`
-        );
-
-
-        const url =
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
-
         try {
 
-            const response =
-                await axios.post(
+            const result =
+                await callGemini({
 
-                    url,
+                    model,
 
-                    {
-                        contents: [
-                            {
-                                parts: [
-                                    {
-                                        text:
-                                            prompt
-                                    }
-                                ]
-                            }
-                        ]
-                    },
+                    systemInstruction,
 
-                    {
-                        timeout:
-                            45000,
+                    prompt
 
-                        headers: {
-
-                            'Content-Type':
-                                'application/json',
-
-                            'x-goog-api-key':
-                                GEMINI_API_KEY
-
-                        }
-                    }
-                );
-
-
-            const text =
-                response
-                    ?.data
-                    ?.candidates?.[0]
-                    ?.content
-                    ?.parts?.[0]
-                    ?.text;
-
-
-            if (!text) {
-
-                throw new Error(
-                    'Gemini returned empty text'
-                );
-            }
+                });
 
 
             console.log(
-                `[Gemini] ${model} succeeded`
+                `[Gemini] SUCCESS using ${model}`
             );
 
 
-            return text;
+            return result;
 
 
-        } catch (error) {
+        } catch (
+        error
+        ) {
 
             lastError =
                 error;
-
-
-            const status =
-                error.response?.status;
 
 
             console.error(
@@ -566,55 +495,26 @@ const generateGeminiContent = async (
             );
 
 
-            if (status) {
-
-                console.error(
-                    `[Gemini] HTTP status: ${status}`
-                );
-
-
-                console.error(
-                    JSON.stringify(
-                        error.response.data,
-                        null,
-                        2
-                    )
-                );
-            }
-
-
-            const retryable =
-                status === 429 ||
-                status === 500 ||
-                status === 502 ||
-                status === 503 ||
-                status === 504 ||
-                error.code ===
-                'ECONNABORTED' ||
-                error.code ===
-                'ETIMEDOUT';
-
-
             if (
-                retryable
+                isModelError(
+                    error
+                )
             ) {
 
-                console.log(
-                    '[Gemini] Trying next model...'
-                );
-
-
-                await sleep(
-                    1000
-                );
-
-
                 continue;
+
             }
 
 
-            throw error;
+            /*
+             * Try next model rather than
+             * immediately killing the request.
+             */
+
+            continue;
+
         }
+
     }
 
 
@@ -624,11 +524,16 @@ const generateGeminiContent = async (
             'All Gemini models failed'
         )
     );
+
 };
 
 
 // ============================================================
 // BUDGET ESTIMATION
+// LOCAL CALCULATION
+//
+// IMPORTANT:
+// This does NOT call Gemini.
 // ============================================================
 
 const estimateBudget = async ({
@@ -644,18 +549,21 @@ const estimateBudget = async ({
     );
 
 
-    const totalBudget =
-        Number(budget);
+    const total =
+        Number(
+            budget
+        );
 
 
     if (
-        !totalBudget ||
-        totalBudget <= 0
+        !Number.isFinite(total) ||
+        total <= 0
     ) {
 
         throw new Error(
             'Invalid budget'
         );
+
     }
 
 
@@ -665,9 +573,33 @@ const estimateBudget = async ({
     switch (
     String(
         travelType ||
-        'budget'
+        'moderate'
     ).toLowerCase()
     ) {
+
+        case 'budget':
+
+            percentages = {
+
+                accommodation:
+                    0.25,
+
+                food:
+                    0.25,
+
+                transport:
+                    0.20,
+
+                activities:
+                    0.15,
+
+                miscellaneous:
+                    0.15
+
+            };
+
+            break;
+
 
         case 'luxury':
 
@@ -693,11 +625,7 @@ const estimateBudget = async ({
             break;
 
 
-        case 'moderate':
-
-        case 'standard':
-
-        case 'comfortable':
+        default:
 
             percentages = {
 
@@ -718,62 +646,39 @@ const estimateBudget = async ({
 
             };
 
-            break;
-
-
-        default:
-
-            percentages = {
-
-                accommodation:
-                    0.32,
-
-                food:
-                    0.22,
-
-                transport:
-                    0.16,
-
-                activities:
-                    0.18,
-
-                miscellaneous:
-                    0.12
-
-            };
     }
 
 
     const accommodation =
         Math.round(
-            totalBudget *
+            total *
             percentages.accommodation
         );
 
 
     const food =
         Math.round(
-            totalBudget *
+            total *
             percentages.food
         );
 
 
     const transport =
         Math.round(
-            totalBudget *
+            total *
             percentages.transport
         );
 
 
     const activities =
         Math.round(
-            totalBudget *
+            total *
             percentages.activities
         );
 
 
     const miscellaneous =
-        totalBudget -
+        total -
         accommodation -
         food -
         transport -
@@ -792,28 +697,34 @@ const estimateBudget = async ({
 
         miscellaneous,
 
-        total:
-            totalBudget
+        total
 
     };
 
 
     console.log(
-        '[Budget] Budget estimation successful:'
-    );
-
-
-    console.log(
+        '[Budget] Budget estimation successful:',
         result
     );
 
 
     return result;
+
 };
 
 
 // ============================================================
 // GENERATE ITINERARY
+//
+// ONE GEMINI CALL
+//
+// Gemini:
+// 1. Understands destination
+// 2. Identifies popular places
+// 3. Creates itinerary
+//
+// NO OSM
+// NO NOMINATIM
 // ============================================================
 
 const generateItinerary = async ({
@@ -821,841 +732,767 @@ const generateItinerary = async ({
     days,
     budget,
     travelType,
-    landmarks = [],
-    weather = null,
-    currency = null
+    currency,
+    startDate = null
 }) => {
 
-    try {
+    console.log(
+        `\n[Itinerary] Starting AI planning for ${destination}`
+    );
 
-        console.log(
-            `\n[Gemini] Starting itinerary generation for ${destination}`
+
+    const numberOfDays =
+        Number(days);
+
+
+    const totalBudget =
+        Number(budget);
+
+
+    if (
+        !Number.isInteger(
+            numberOfDays
+        ) ||
+        numberOfDays <= 0
+    ) {
+
+        throw new Error(
+            'Invalid number of days'
         );
 
-
-        const numberOfDays =
-            Number(days);
+    }
 
 
-        if (
-            !numberOfDays ||
-            numberOfDays <= 0
-        ) {
+    if (
+        !Number.isFinite(
+            totalBudget
+        ) ||
+        totalBudget <= 0
+    ) {
 
-            throw new Error(
-                'Invalid number of days'
-            );
-        }
-
-
-        // ====================================================
-        // CLEAN LANDMARK DATA
-        // ====================================================
-
-        const groupedLandmarks =
-            cleanRealLandmarks(
-                landmarks
-            );
-
-
-        const allLandmarks =
-            groupedLandmarks.flat();
-
-
-        console.log(
-            `[Itinerary] Received ${landmarks.flat?.().length || 0} landmark entries`
+        throw new Error(
+            'Invalid budget'
         );
 
-
-        console.log(
-            `[Itinerary] ${allLandmarks.length} valid real landmarks after cleaning`
-        );
+    }
 
 
-        if (
-            allLandmarks.length === 0
-        ) {
+    // ========================================================
+    // LOCAL BUDGET
+    // ========================================================
 
-            throw new Error(
-                'No valid real landmarks available'
-            );
-        }
+    const budgetBreakdown =
+        await estimateBudget({
 
+            destination,
 
-        /*
-         * Log rejected IDs so you can see
-         * exactly what was removed.
-         */
+            days:
+                numberOfDays,
 
-        if (
-            Array.isArray(
-                landmarks
-            )
-        ) {
+            budget:
+                totalBudget,
 
-            landmarks
-                .flat()
-                .forEach(
-                    place => {
+            travelType,
 
-                        if (
-                            !isValidLandmarkObject(
-                                place
-                            )
-                        ) {
-
-                            console.warn(
-                                `[Itinerary] Ignoring invalid landmark:`,
-                                place?.name
-                            );
-                        }
-                    }
-                );
-        }
-
-
-        // ====================================================
-        // GROUPED PLACES FOR GEMINI
-        // ====================================================
-
-        const groupedPlacesText =
-            groupedLandmarks
-                .map(
-                    (
-                        dayPlaces,
-                        index
-                    ) => {
-
-                        const places =
-                            Array.isArray(
-                                dayPlaces
-                            )
-                                ? dayPlaces
-                                : [];
-
-
-                        if (
-                            places.length === 0
-                        ) {
-
-                            return `
-DAY ${index + 1}:
-
-No specific landmarks available.
-Choose rest/local exploration only.
-`;
-                        }
-
-
-                        const text =
-                            places
-                                .map(
-                                    (
-                                        place,
-                                        placeIndex
-                                    ) => {
-
-                                        return (
-                                            `${placeIndex + 1}. ` +
-                                            `${place.name} ` +
-                                            `| ${place.distanceFromCenter || 0} km from center ` +
-                                            `| ${place.type || place.class || 'attraction'}`
-                                        );
-
-                                    }
-                                )
-                                .join('\n');
-
-
-                        return `
-DAY ${index + 1} RECOMMENDED REAL PLACES:
-
-${text}
-`;
-                    }
-                )
-                .join('\n');
-
-
-        // ====================================================
-        // WEATHER
-        // ====================================================
-
-        let weatherText =
-            'Weather unavailable';
-
-
-        if (
-            weather
-        ) {
-
-            try {
-
-                weatherText =
-                    JSON.stringify(
-                        weather
-                    );
-
-            } catch {
-
-                weatherText =
-                    'Weather unavailable';
-            }
-        }
-
-
-        // ====================================================
-        // CURRENCY
-        // ====================================================
-
-        let currencyText =
-            'INR';
-
-
-        if (
             currency
-        ) {
 
-            try {
-
-                currencyText =
-                    JSON.stringify(
-                        currency
-                    );
-
-            } catch {
-
-                currencyText =
-                    'INR';
-            }
-        }
+        });
 
 
-        // ====================================================
-        // STRICT GEMINI PROMPT
-        // ====================================================
+    // ========================================================
+    // SAME TRAVEL ASSISTANT STYLE AS CHATBOT
+    // ========================================================
 
-        const prompt = `
-You are an expert travel itinerary planner.
+    const systemInstruction = `
 
-DESTINATION:
-${destination}
+You are VoyageAI Assistant.
 
-TRIP LENGTH:
-${numberOfDays} days
+You are the same intelligent travel assistant
+used by our travel chatbot.
 
-TOTAL BUDGET:
-₹${budget}
+You are highly knowledgeable about:
 
-TRAVEL TYPE:
-${travelType || 'budget'}
+- destinations
+- tourist attractions
+- famous places
+- temples
+- historical sites
+- monuments
+- natural attractions
+- viewpoints
+- cultural attractions
+- things to do
+- travel planning
+- itineraries
 
-CURRENCY:
-${currencyText}
+Understand the destination naturally using your
+travel knowledge.
 
-GEOGRAPHICALLY GROUPED REAL LANDMARKS:
+The destination may be a city, town, district,
+region, state or country.
 
-${groupedPlacesText}
+Your first priority is to identify the places
+that a knowledgeable travel assistant would
+actually recommend.
 
-WEATHER:
-${weatherText}
+IMPORTANT:
 
+Do NOT use OpenStreetMap.
 
-============================================================
-CRITICAL PLACE-NAME RULES
-============================================================
+Do NOT use Nominatim.
 
-1. ONLY use real, human-readable place names from the
-   supplied landmark list.
+Do NOT use road IDs.
 
-2. NEVER invent a landmark.
+Do NOT use MDR/NH/SH codes.
 
-3. NEVER use a place from another city or destination.
+Do NOT invent machine IDs.
 
-4. NEVER use internal IDs.
+Do NOT create random attractions simply to fill
+the itinerary.
 
-5. NEVER use database identifiers.
+Return ONLY valid JSON.
 
-6. NEVER use map/reference identifiers.
-
-7. NEVER use codes such as:
-
-   MDR32
-   MDR-32
-   POI123
-   POI-123
-   LOC45
-   REF12
-   ID123
-   PLACE42
-   ABC123
-
-8. The "place" field MUST contain the actual human-readable
-   landmark name.
-
-9. If a landmark has an internal ID but no valid human-readable
-   name, DO NOT use that landmark.
-
-10. Do not create names from IDs.
-
-11. Do not convert an ID into a fake landmark name.
-
-12. If you cannot confidently identify a real place from the
-    supplied list, DO NOT include that activity.
-
-13. The activity.place value must match one of the supplied
-    landmark names.
-
-14. Preserve the original landmark spelling whenever possible.
-
-15. Do not replace a real landmark name with a generic phrase
-    such as "Local landmark", "Nearby attraction", "Scenic area",
-    or "Local sightseeing".
-
-16. Do not create fictional places.
-
-17. Do not use road IDs, route IDs or reference numbers as
-    attraction names.
+`;
 
 
-============================================================
-GEOGRAPHICAL RULES
-============================================================
+    // ========================================================
+    // SINGLE REQUEST
+    // ========================================================
 
-1. The destination is ONLY:
-   ${destination}
+    const prompt = `
 
-2. Day 1 must prioritize places listed under DAY 1.
+I am planning a trip.
 
-3. Day 2 must prioritize places listed under DAY 2.
+Destination:
+"${destination}"
 
-4. Day 3 must prioritize places listed under DAY 3.
+Number of days:
+${numberOfDays}
 
-5. Continue this pattern for all available days.
+Budget:
+₹${totalBudget}
 
-6. Day 1 and Day 2 should contain the closest places.
+Travel type:
+${travelType || 'moderate'}
 
-7. Later days may progressively cover farther places.
-
-8. Do not move far-away locations into Day 1 when nearby
-   locations are available.
-
-9. Keep geographically nearby places together.
-
-10. Do not repeat the same attraction.
-
-11. Maximum 3 major activities per day.
+Start date:
+${startDate || 'Not specified'}
 
 
-============================================================
-GENERAL RULES
-============================================================
+========================================================
+STEP 1 — UNDERSTAND THE DESTINATION
+========================================================
 
-1. Do not change the destination.
+Think exactly like a knowledgeable travel chatbot.
 
-2. Do not invent exact opening hours.
+If a user asked:
 
-3. Do not invent exact ticket prices.
+"What are all the places I can cover in
+${destination}?"
 
-4. Estimated costs are acceptable.
+determine the important places that should
+actually be recommended.
 
-5. Keep descriptions concise.
+Prioritize:
 
-6. Return ONLY valid JSON.
+1. Most famous attractions
+2. Major landmarks
+3. Important religious places
+4. Major historical places
+5. Important natural attractions
+6. Popular cultural attractions
+7. Good secondary attractions
 
-7. Do NOT return markdown.
 
-8. Create exactly ${numberOfDays} day objects.
+========================================================
+STEP 2 — POPULAR PLACES
+========================================================
+
+Create a list of the important tourist places.
+
+Do NOT choose random locations.
+
+The first places must be the most important
+and popular attractions.
+
+If the destination has many attractions,
+identify approximately 8-15 useful places.
+
+If it genuinely has fewer attractions,
+return fewer.
 
 
-============================================================
-OUTPUT FORMAT
-============================================================
+========================================================
+STEP 3 — CREATE ITINERARY
+========================================================
+
+Create exactly ${numberOfDays} days.
+
+Use the popular places identified in Step 1.
+
+Major attractions MUST receive priority.
+
+Do not leave major attractions unused merely
+because a secondary attraction is closer.
+
+
+========================================================
+GEOGRAPHY
+========================================================
+
+Arrange places logically.
+
+Keep nearby places together where possible.
+
+Avoid unnecessary backtracking.
+
+However:
+
+POPULARITY > small distance difference.
+
+
+========================================================
+DAILY PACE
+========================================================
+
+Travel type:
+
+${travelType || 'moderate'}
+
+
+For moderate travel:
+
+2-3 major attractions per day.
+
+For budget travel:
+
+Prefer free/low-cost attractions.
+
+For luxury travel:
+
+Allow comfortable pacing and premium
+experiences.
+
+
+========================================================
+TIMINGS
+========================================================
+
+Use realistic visiting times.
+
+Example:
+
+07:00 AM
+09:00 AM
+11:30 AM
+01:30 PM
+03:30 PM
+05:30 PM
+07:00 PM
+
+Do not create impossible schedules.
+
+
+========================================================
+BUDGET
+========================================================
+
+Total budget:
+
+₹${totalBudget}
+
+Budget breakdown:
+
+${JSON.stringify(
+        budgetBreakdown,
+        null,
+        2
+    )}
+
+Stay approximately within this budget.
+
+Free attractions:
+
+estimatedCost = 0
+
+
+========================================================
+IMPORTANT
+========================================================
+
+The requested destination is:
+
+"${destination}"
+
+It MUST remain the primary destination.
+
+Do not silently change it to another city.
+
+Nearby places can only be included if they
+genuinely make sense for the trip.
+
+
+========================================================
+NO DUPLICATES
+========================================================
+
+Never use the same attraction twice.
+
+
+========================================================
+NO FAKE IDS
+========================================================
+
+Never output:
+
+MDR235
+MDR234
+MDR226
+NH333
+NH44
+SH12
+POI123
+LOC123
+REF123
+ID123
+
+
+========================================================
+OUTPUT
+========================================================
+
+Return ONLY this JSON:
 
 {
     "destination": "${destination}",
 
+    "popularPlaces": [
+
+        {
+            "name": "Actual famous attraction",
+
+            "importance": "major",
+
+            "category": "temple",
+
+            "description": "Short description",
+
+            "whyVisit": "Why it is worth visiting"
+        }
+
+    ],
+
     "days": [
+
         {
             "day": 1,
 
             "title": "Day 1",
 
+            "theme": "Daily theme",
+
             "activities": [
+
                 {
-                    "time": "09:00 AM",
+                    "time": "08:00 AM",
 
-                    "place": "REAL LANDMARK NAME",
+                    "place": "Actual attraction",
 
-                    "activity": "Short description",
+                    "activity": "What to do",
 
                     "duration": "2 hours",
 
-                    "travelTimeFromPrevious": "15 minutes",
+                    "travelTimeFromPrevious":
+                        "15 minutes",
 
-                    "distanceFromPrevious": "2 km",
+                    "distanceFromPrevious":
+                        "3 km",
 
-                    "estimatedCost": 500
+                    "estimatedCost": 0
                 }
+
             ],
 
-            "dailyEstimatedCost": 3000
+            "dailyEstimatedCost": 5000
         }
+
     ],
 
-    "totalEstimatedCost": ${Number(budget)},
+    "budgetBreakdown": {
+
+        "accommodation":
+            ${budgetBreakdown.accommodation},
+
+        "food":
+            ${budgetBreakdown.food},
+
+        "transport":
+            ${budgetBreakdown.transport},
+
+        "activities":
+            ${budgetBreakdown.activities},
+
+        "miscellaneous":
+            ${budgetBreakdown.miscellaneous},
+
+        "total":
+            ${budgetBreakdown.total}
+    },
+
+    "totalEstimatedCost":
+        ${totalBudget},
 
     "tips": [
-        "Travel tip"
+
+        "Useful travel tip"
+
     ]
+
 }
 
-Create exactly ${numberOfDays} days.
+
+========================================================
+FINAL CHECK
+========================================================
+
+Before responding:
+
+1. Exactly ${numberOfDays} days.
+
+2. Identify popular attractions first.
+
+3. Use the most famous attractions in the
+   itinerary.
+
+4. Keep the requested destination as primary.
+
+5. No duplicate attractions.
+
+6. No road IDs.
+
+7. No MDR/NH/SH codes.
+
+8. No invented machine IDs.
+
+9. Realistic daily schedule.
+
+10. Budget approximately ₹${totalBudget}.
+
+11. Return ONLY JSON.
+
 `;
 
 
-        console.log(
-            `[Gemini] Itinerary prompt length: ${prompt.length}`
+    console.log(
+        '[Itinerary] Sending ONE Gemini request...'
+    );
+
+
+    const start =
+        Date.now();
+
+
+    const text =
+        await generateGeminiJson({
+
+            systemInstruction,
+
+            prompt
+
+        });
+
+
+    console.log(
+        `[Itinerary] Gemini completed in ${Date.now() - start} ms`
+    );
+
+
+    // ========================================================
+    // PARSE
+    // ========================================================
+
+    let itinerary;
+
+
+    try {
+
+        itinerary =
+            JSON.parse(
+                cleanJson(
+                    text
+                )
+            );
+
+    } catch (
+    error
+    ) {
+
+        console.error(
+            '[Itinerary] Invalid Gemini JSON:'
+        );
+
+        console.error(
+            text
+        );
+
+        throw new Error(
+            'Gemini returned invalid itinerary JSON'
+        );
+
+    }
+
+
+    // ========================================================
+    // EXACT DAYS
+    // ========================================================
+
+    if (
+        !Array.isArray(
+            itinerary.days
+        )
+    ) {
+
+        throw new Error(
+            'Gemini did not return days'
+        );
+
+    }
+
+
+    itinerary.days =
+        itinerary.days.slice(
+            0,
+            numberOfDays
         );
 
 
-        // ====================================================
-        // GEMINI
-        // ====================================================
+    while (
+        itinerary.days.length <
+        numberOfDays
+    ) {
 
-        const text =
-            await generateGeminiContent(
-                prompt
-            );
+        itinerary.days.push({
 
+            day:
+                itinerary.days.length + 1,
 
-        console.log(
-            '[Gemini] Itinerary response received'
-        );
+            title:
+                `Day ${itinerary.days.length + 1}`,
 
+            theme:
+                'Local exploration',
 
-        const cleaned =
-            cleanJson(
-                text
-            );
+            activities: [],
 
+            dailyEstimatedCost:
+                0
 
-        let itinerary;
+        });
 
+    }
 
-        try {
 
-            itinerary =
-                JSON.parse(
-                    cleaned
-                );
+    // ========================================================
+    // REMOVE DUPLICATES
+    // ========================================================
 
-        } catch (error) {
+    const usedPlaces =
+        new Set();
 
-            console.error(
-                '[Gemini] Invalid JSON:'
-            );
 
+    itinerary.days =
+        itinerary.days.map(
+            (
+                day,
+                index
+            ) => {
 
-            console.error(
-                cleaned
-            );
+                const activities =
+                    Array.isArray(
+                        day.activities
+                    )
+                        ? day.activities
+                        : [];
 
 
-            throw new Error(
-                'Gemini returned invalid JSON'
-            );
-        }
+                const cleanedActivities =
+                    activities.filter(
+                        activity => {
 
+                            if (
+                                !activity ||
+                                !activity.place
+                            ) {
 
-        // ====================================================
-        // VALIDATE DAYS
-        // ====================================================
+                                return false;
 
-        if (
-            !Array.isArray(
-                itinerary.days
-            )
-        ) {
+                            }
 
-            throw new Error(
-                'Gemini did not return itinerary days'
-            );
-        }
 
+                            const name =
+                                String(
+                                    activity.place
+                                ).trim();
 
-        // ====================================================
-        // VALIDATE AND REPLACE PLACES
-        // ====================================================
 
-        let removed =
-            0;
+                            if (
+                                isInvalidPlaceName(
+                                    name
+                                )
+                            ) {
 
-        let corrected =
-            0;
+                                console.warn(
+                                    `[Itinerary] Removed invalid place: ${name}`
+                                );
 
+                                return false;
 
-        itinerary.days =
-            itinerary.days.map(
-                (
-                    day,
-                    index
-                ) => {
+                            }
 
-                    const activities =
-                        Array.isArray(
-                            day.activities
-                        )
-                            ? day.activities
-                            : [];
 
-
-                    const validActivities =
-                        activities
-                            .map(
-                                activity => {
-
-                                    if (
-                                        !activity ||
-                                        typeof activity !== 'object'
-                                    ) {
-
-                                        removed++;
-
-                                        return null;
-                                    }
-
-
-                                    const generatedPlace =
-                                        activity.place;
-
-
-                                    const realPlace =
-                                        findMatchingRealPlace(
-                                            generatedPlace,
-                                            allLandmarks
-                                        );
-
-
-                                    // --------------------------------
-                                    // INVALID PLACE
-                                    // --------------------------------
-
-                                    if (
-                                        !realPlace
-                                    ) {
-
-                                        console.warn(
-                                            `[Itinerary] Removing invalid generated place: ${generatedPlace}`
-                                        );
-
-
-                                        removed++;
-
-                                        return null;
-                                    }
-
-
-                                    /*
-                                     * If Gemini returned a variation
-                                     * of the real name, replace it
-                                     * with the exact real landmark name.
-                                     */
-
-                                    if (
-                                        normalizePlaceName(
-                                            generatedPlace
-                                        ) !==
-                                        normalizePlaceName(
-                                            realPlace.name
-                                        )
-                                    ) {
-
-                                        console.log(
-                                            `[Itinerary] Correcting place "${generatedPlace}" -> "${realPlace.name}"`
-                                        );
-
-
-                                        corrected++;
-                                    }
-
-
-                                    return {
-
-                                        ...activity,
-
-                                        place:
-                                            realPlace.name
-
-                                    };
-
-                                }
-                            )
-                            .filter(
-                                Boolean
-                            );
-
-
-                    return {
-
-                        day:
-                            index + 1,
-
-                        title:
-                            day.title ||
-                            `Day ${index + 1}`,
-
-                        activities:
-                            validActivities,
-
-                        dailyEstimatedCost:
-                            Number(
-                                day.dailyEstimatedCost
-                            ) || 0
-
-                    };
-                }
-            );
-
-
-        console.log(
-            `[Itinerary] Removed invalid places: ${removed}`
-        );
-
-
-        console.log(
-            `[Itinerary] Corrected place names: ${corrected}`
-        );
-
-
-        // ====================================================
-        // REMOVE DUPLICATE PLACES
-        // ====================================================
-
-        const usedPlaces =
-            new Set();
-
-
-        itinerary.days =
-            itinerary.days.map(
-                day => {
-
-                    const uniqueActivities =
-                        day.activities.filter(
-                            activity => {
-
-                                const normalized =
-                                    normalizePlaceName(
-                                        activity.place
-                                    );
-
-
-                                if (
-                                    usedPlaces.has(
-                                        normalized
-                                    )
-                                ) {
-
-                                    console.warn(
-                                        `[Itinerary] Removing duplicate place: ${activity.place}`
-                                    );
-
-
-                                    return false;
-                                }
-
-
-                                usedPlaces.add(
-                                    normalized
+                            const key =
+                                normalizePlaceName(
+                                    name
                                 );
 
 
-                                return true;
+                            if (
+                                usedPlaces.has(
+                                    key
+                                )
+                            ) {
+
+                                console.warn(
+                                    `[Itinerary] Removed duplicate: ${name}`
+                                );
+
+                                return false;
+
                             }
-                        );
 
 
-                    return {
-
-                        ...day,
-
-                        activities:
-                            uniqueActivities
-
-                    };
-                }
-            );
+                            usedPlaces.add(
+                                key
+                            );
 
 
-        // ====================================================
-        // ENSURE EXACT NUMBER OF DAYS
-        // ====================================================
+                            return true;
 
-        while (
-            itinerary.days.length <
-            numberOfDays
-        ) {
-
-            itinerary.days.push({
-
-                day:
-                    itinerary.days.length + 1,
-
-                title:
-                    `Day ${itinerary.days.length + 1}`,
-
-                activities: [],
-
-                dailyEstimatedCost:
-                    0
-
-            });
-        }
+                        }
+                    );
 
 
-        if (
-            itinerary.days.length >
-            numberOfDays
-        ) {
-
-            itinerary.days =
-                itinerary.days.slice(
-                    0,
-                    numberOfDays
-                );
-        }
-
-
-        // ====================================================
-        // FORCE DESTINATION
-        // ====================================================
-
-        itinerary.destination =
-            destination;
-
-
-        // ====================================================
-        // TOTAL COST
-        // ====================================================
-
-        itinerary.totalEstimatedCost =
-            Number(
-                itinerary.totalEstimatedCost
-            ) ||
-            Number(
-                budget
-            );
-
-
-        // ====================================================
-        // TIPS
-        // ====================================================
-
-        if (
-            !Array.isArray(
-                itinerary.tips
-            )
-        ) {
-
-            itinerary.tips = [];
-        }
-
-
-        // ====================================================
-        // FINAL SAFETY CHECK
-        // ====================================================
-
-        /*
-         * Final pass ensures that absolutely nothing
-         * like MDR32 can reach the frontend.
-         */
-
-        itinerary.days =
-            itinerary.days.map(
-                day => ({
+                return {
 
                     ...day,
 
+                    day:
+                        index + 1,
+
                     activities:
-                        day.activities.filter(
-                            activity => {
+                        cleanedActivities
 
-                                const valid =
-                                    isValidGeneratedPlace(
-                                        activity.place,
-                                        allLandmarks
-                                    );
+                };
 
-
-                                if (!valid) {
-
-                                    console.error(
-                                        `[FINAL VALIDATION] Blocked invalid place: ${activity.place}`
-                                    );
-
-                                }
-
-
-                                return valid;
-
-                            }
-                        )
-
-                })
-            );
-
-
-        console.log(
-            '[Gemini] Itinerary generation successful'
+            }
         );
 
 
-        console.log(
-            '[Itinerary] Final itinerary:',
-            JSON.stringify(
-                itinerary,
-                null,
-                2
-            )
-        );
+    // ========================================================
+    // FINAL VALUES
+    // ========================================================
+
+    itinerary.destination =
+        destination;
 
 
-        return itinerary;
+    itinerary.budgetBreakdown =
+        budgetBreakdown;
 
 
-    } catch (error) {
-
-        console.error(
-            '[Gemini] Itinerary generation failed:',
-            error.message
-        );
+    itinerary.totalEstimatedCost =
+        totalBudget;
 
 
-        if (
-            error.response
-        ) {
+    if (
+        !Array.isArray(
+            itinerary.popularPlaces
+        )
+    ) {
 
-            console.error(
-                '[Gemini] HTTP Status:',
-                error.response.status
-            );
+        itinerary.popularPlaces = [];
 
-
-            console.error(
-                '[Gemini] Response:',
-                JSON.stringify(
-                    error.response.data,
-                    null,
-                    2
-                )
-            );
-        }
-
-
-        throw new Error(
-            'AI planning engine failed to generate an itinerary.'
-        );
     }
+
+
+    if (
+        !Array.isArray(
+            itinerary.tips
+        )
+    ) {
+
+        itinerary.tips = [];
+
+    }
+
+
+    // ========================================================
+    // LOG
+    // ========================================================
+
+    console.log(
+        '\n[Itinerary] POPULAR PLACES'
+    );
+
+
+    itinerary.popularPlaces.forEach(
+        (
+            place,
+            index
+        ) => {
+
+            console.log(
+                `  ${index + 1}. ${place.name}`
+            );
+
+        }
+    );
+
+
+    console.log(
+        '\n[Itinerary] FINAL RESULT'
+    );
+
+
+    itinerary.days.forEach(
+        day => {
+
+            console.log(
+                `\nDay ${day.day}: ${day.title}`
+            );
+
+
+            day.activities.forEach(
+                activity => {
+
+                    console.log(
+                        `  ${activity.time} → ${activity.place}`
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+    console.log(
+        `\n[Itinerary] Total budget: ₹${totalBudget}`
+    );
+
+
+    return itinerary;
+
 };
 
 

@@ -1,89 +1,34 @@
 const { GoogleGenAI } = require('@google/genai');
 
-
-// ======================================================
-// GEMINI CONFIGURATION
-// ======================================================
-
-const GEMINI_API_KEY =
-    process.env.GEMINI_API_KEY;
-
-
-// Primary model comes from .env.
-// If it is not specified, use Gemini 3.7 Flash.
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 const PRIMARY_MODEL =
-    process.env.GEMINI_MODEL ||
-    'gemini-3.7-flash';
-
-
-// ======================================================
-// FALLBACK MODELS
-// ======================================================
-//
-// IMPORTANT:
-//
-// If the primary model gives 404 / NOT_FOUND,
-// we DO NOT retry that model.
-//
-// We immediately move to the next model.
-//
-// If a model gives a temporary 503 / 429 error,
-// we retry it ONCE and then move to the next model.
-//
+    process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
 const FALLBACK_MODELS = [
-
-    'gemini-3.6-flash',
-
-    'gemini-3-flash'
-
+    'gemini-3-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3-flash-preview'
 ];
 
-
-// ======================================================
-// FINAL MODEL LIST
-// ======================================================
-
 const GEMINI_MODELS = [
-
     PRIMARY_MODEL,
-
     ...FALLBACK_MODELS
-
 ].filter(
-
     (model, index, array) =>
-
-        array.indexOf(model) === index
-
+        model && array.indexOf(model) === index
 );
-
-
-// ======================================================
-// CREATE GEMINI CLIENT
-// ======================================================
 
 let ai = null;
 
-
-if (
-    GEMINI_API_KEY
-) {
-
+if (GEMINI_API_KEY) {
     ai = new GoogleGenAI({
-
-        apiKey:
-            GEMINI_API_KEY
-
+        apiKey: GEMINI_API_KEY
     });
-
 } else {
-
     console.warn(
         '[VoyageAI] GEMINI_API_KEY is missing from .env'
     );
-
 }
 
 
@@ -92,31 +37,28 @@ if (
 // ======================================================
 
 const SUPPORTED_LANGUAGES = [
-
     'English',
-
     'Tamil',
-
     'Hindi',
-
     'Telugu',
-
     'Kannada',
-
     'Malayalam',
-
     'Bengali',
-
     'Marathi',
-
     'Gujarati',
-
     'Punjabi',
-
     'Odia',
-
-    'Urdu'
-
+    'Urdu',
+    'French',
+    'Spanish',
+    'German',
+    'Italian',
+    'Japanese',
+    'Korean',
+    'Chinese',
+    'Arabic',
+    'Portuguese',
+    'Russian'
 ];
 
 
@@ -125,300 +67,181 @@ const SUPPORTED_LANGUAGES = [
 // ======================================================
 
 const createSystemPrompt = (
-
     language,
-
     translate
-
 ) => {
 
     const selectedLanguage =
-
-        SUPPORTED_LANGUAGES.includes(
-            language
-        )
-
+        SUPPORTED_LANGUAGES.includes(language)
             ? language
-
             : 'English';
 
-
     return `
-
 You are VoyageAI Assistant.
 
-You are the intelligent AI travel assistant
-inside the VoyageAI application.
+You are an intelligent, friendly and dynamic
+travel assistant.
 
-Your job is to provide useful, natural,
-dynamic answers to the user's questions.
-
-You are NOT a keyword-based chatbot.
-
-==================================================
-YOUR MAIN PURPOSE
-==================================================
-
-You are a general-purpose travel assistant.
-
-You should dynamically answer questions about:
-
-• Travel
-• Destinations
-• Tourism
-• Tourist attractions
-• Places to visit
-• Things to do
-• Weekend trips
-• Domestic travel
-• International travel
-• Itinerary ideas
-• Transportation
-• Flights
-• Trains
-• Buses
-• Hotels
-• Accommodation
-• Restaurants
-• Food
-• Travel budgets
-• Currency
-• Foreign exchange
-• Payment methods
-• Forex cards
-• Cash
-• Packing
-• Travel preparation
-• Local customs
-• Travel tips
-• Travel planning
-• Destination comparisons
-• Language assistance
-• Translation
+Your purpose is to answer the user's actual
+question naturally rather than relying on
+predefined questions or hard-coded answers.
 
 ==================================================
-DYNAMIC RESPONSES
+TRAVEL
 ==================================================
 
-Do NOT depend on predefined questions.
+You can help with:
 
-Do NOT depend on predefined answers.
+- Travel planning
+- Destinations
+- Tourist attractions
+- Things to do
+- Weekend trips
+- Domestic travel
+- International travel
+- Itinerary suggestions
+- Transportation
+- Flights
+- Trains
+- Buses
+- Hotels
+- Accommodation
+- Restaurants
+- Food
+- Travel budgets
+- Currency
+- Foreign exchange
+- Payment methods
+- Forex cards
+- Cash
+- Packing
+- Travel preparation
+- Local customs
+- Travel tips
+- Destination comparisons
+
+==================================================
+DYNAMIC ANSWERS
+==================================================
 
 Understand the meaning of the user's question
-and generate the appropriate response.
+and generate an appropriate answer.
+
+Do NOT depend on keyword matching.
+
+Do NOT provide only predefined answers.
 
 For example, if the user asks:
 
-"What would be the right destination for
-this weekend?"
+"What is a good destination for this weekend?"
 
 Give useful destination recommendations.
 
 If the user asks:
 
-"I have ₹30,000. Where can I travel?"
+"I have ₹30000. Where can I travel?"
 
-Suggest destinations appropriate for that
-budget and explain why.
-
-If the user asks:
-
-"Which is better for a family trip,
-Kerala or Goa?"
-
-Compare them meaningfully.
+Suggest destinations appropriate for that budget.
 
 If the user asks:
 
-"What should I pack for Japan in winter?"
+"Kerala or Goa?"
 
-Give a practical packing list.
-
-If the user asks:
-
-"How can I travel around Europe cheaply?"
-
-Give useful travel-saving advice.
+Explain the differences and recommend based
+on likely travel preferences.
 
 ==================================================
-NO DATABASE ACCESS
+DATABASE
 ==================================================
 
-You do NOT have access to:
+You do NOT have access to the user's:
 
-• User profiles
-• User's saved trips
-• User's expenses
-• User's personal budget
-• PostgreSQL
-• Application database
-• Private user records
+- Profile
+- Saved trips
+- Expenses
+- Personal budget
+- PostgreSQL database
+- Private application data
 
-Never claim that you can see these.
+Never claim that you can access these.
 
-If the user asks about their personal saved
-trips or expenses, tell them to check the
-appropriate VoyageAI Profile or Expense page.
-
-==================================================
-TRAVEL BUDGETS
-==================================================
-
-You may provide general travel budget estimates.
-
-Clearly identify estimates as estimates.
-
-Travel costs can change based on:
-
-• Season
-• Destination
-• Accommodation
-• Transportation
-• Food
-• Travel style
-• Exchange rates
-• Number of travelers
-
-Never present an estimate as a guaranteed price.
+If the user asks about their saved trips,
+expenses or profile information, tell them
+that they can check the relevant VoyageAI
+application page.
 
 ==================================================
-CURRENCY
+LANGUAGE
 ==================================================
 
-You can explain:
+The selected response language is:
 
-• Currencies
-• Exchange rates
-• Currency conversion
-• Foreign exchange
-• Payment methods
-• Forex cards
-• Cash
-• Card payments
-• Currency tips
+${selectedLanguage}
 
-Do not claim that an exchange rate is live
-unless live exchange-rate information is actually
-provided to you.
+Respond in that language unless the user
+explicitly requests another language.
 
 ==================================================
 TRANSLATION
-==================================================
-
-You are also a multilingual translator.
-
-You can translate between English and Indian
-languages including:
-
-• Tamil
-• Hindi
-• Telugu
-• Kannada
-• Malayalam
-• Bengali
-• Marathi
-• Gujarati
-• Punjabi
-• Odia
-• Urdu
-
-You can also translate common international
-languages including:
-
-• French
-• Spanish
-• German
-• Italian
-• Japanese
-• Korean
-• Chinese
-• Arabic
-• Portuguese
-• Russian
-
-Preserve the original meaning.
-
-Do not unnecessarily explain the translation.
-
-==================================================
-RESPONSE LANGUAGE
-==================================================
-
-The currently selected response language is:
-
-${selectedLanguage}
-
-Normally respond in:
-
-${selectedLanguage}
-
-If the user explicitly requests another
-language, follow that request.
-
-==================================================
-TRANSLATION MODE
 ==================================================
 
 Translation mode:
 
 ${translate ? 'ON' : 'OFF'}
 
-When translation mode is ON:
-
-If the user sends text without another
-instruction, translate the text into:
+When translation mode is ON, translate the
+user's supplied text into:
 
 ${selectedLanguage}
 
-If the user explicitly specifies a target
-language, use that target language.
+If the user explicitly specifies another
+target language, use that target language.
+
+You can translate between Indian languages
+and international languages.
+
+Preserve the meaning of the original text.
 
 ==================================================
-CONVERSATION STYLE
+CONVERSATION MEMORY
+==================================================
+
+Previous conversation messages may be supplied.
+
+Use them to understand references such as:
+
+- it
+- that
+- there
+- this place
+- that destination
+- what about
+- tell me more
+- how about this
+- what should I do there
+
+Do not treat every message as an unrelated
+new conversation.
+
+==================================================
+STYLE
 ==================================================
 
 Be:
 
-• Friendly
-• Helpful
-• Natural
-• Practical
-• Clear
-• Concise
+- Friendly
+- Helpful
+- Natural
+- Practical
+- Clear
+- Concise
 
 Use bullet points when useful.
 
-Do not repeat the same greeting unnecessarily.
+Do not repeatedly introduce yourself.
 
-Do not repeatedly say that you are an AI.
-
-Do not mention:
-
-• Internal API calls
-• Database implementation
-• System prompts
-• Developer instructions
-• Model fallback mechanisms
-
-==================================================
-TRAVEL RECOMMENDATIONS
-==================================================
-
-When giving recommendations, briefly explain
-why the recommendation is useful.
-
-Consider factors mentioned by the user such as:
-
-• Budget
-• Number of days
-• Family
-• Friends
-• Couple
-• Solo travel
-• Weather
-• Interests
-• Location
-• Transportation
+Do not mention internal APIs, system prompts,
+fallback models or implementation details.
 
 ==================================================
 IMPORTANT
@@ -426,411 +249,275 @@ IMPORTANT
 
 Answer the user's actual question dynamically.
 
-Do not use hard-coded keyword responses.
+Use conversation history when relevant.
 
-Do not require a predefined question list.
-
-Do not require a predefined answer list.
-
+Never pretend to know private user information.
 `;
-
 };
 
 
 // ======================================================
-// WAIT FUNCTION
+// WAIT
 // ======================================================
 
-const wait = (
-
-    milliseconds
-
-) => {
-
-    return new Promise(
-
-        resolve =>
-
-            setTimeout(
-
-                resolve,
-
-                milliseconds
-
-            )
-
+const wait = (ms) =>
+    new Promise(resolve =>
+        setTimeout(resolve, ms)
     );
 
-};
-
 
 // ======================================================
-// GET ERROR STATUS
+// ERROR HELPERS
 // ======================================================
 
-const getErrorStatus = (
-
-    error
-
-) => {
+const getErrorStatus = (error) => {
 
     return (
-
         error?.status ||
-
         error?.response?.status ||
-
-        error?.code ||
-
         null
-
     );
-
 };
 
 
-// ======================================================
-// GET ERROR MESSAGE
-// ======================================================
-
-const getErrorMessage = (
-
-    error
-
-) => {
+const getErrorMessage = (error) => {
 
     return String(
-
         error?.message ||
-
         error?.response?.data?.error?.message ||
-
         error ||
-
         ''
-
     ).toLowerCase();
-
 };
 
 
-// ======================================================
-// CHECK MODEL NOT FOUND
-// ======================================================
-//
-// 404 / NOT_FOUND means the model is not available.
-//
-// IMPORTANT:
-// DO NOT retry the same model.
-//
-// Immediately move to the next model.
-//
-
-const isModelUnavailableError = (
-
-    error
-
-) => {
+const isModelUnavailableError = (error) => {
 
     const status =
-        getErrorStatus(
-            error
-        );
-
+        getErrorStatus(error);
 
     const message =
-        getErrorMessage(
-            error
-        );
-
+        getErrorMessage(error);
 
     return (
-
         status === 404 ||
-
         String(status) === '404' ||
-
-        message.includes(
-            '404'
-        ) ||
-
-        message.includes(
-            'not_found'
-        ) ||
-
-        message.includes(
-            'model not found'
-        ) ||
-
-        message.includes(
-            'model is not available'
-        ) ||
-
-        message.includes(
-            'no longer available'
-        ) ||
-
-        message.includes(
-            'not available to new users'
-        )
-
+        message.includes('404') ||
+        message.includes('not_found') ||
+        message.includes('model not found') ||
+        message.includes('no longer available') ||
+        message.includes('not available to new users')
     );
-
 };
 
 
-// ======================================================
-// CHECK TEMPORARY ERROR
-// ======================================================
-//
-// These errors may be temporary:
-//
-// 429
-// 500
-// 502
-// 503
-// 504
-//
-// We retry the current model once.
-//
-
-const isTemporaryError = (
-
-    error
-
-) => {
+const isTemporaryError = (error) => {
 
     const status =
-        getErrorStatus(
-            error
-        );
-
+        getErrorStatus(error);
 
     const message =
-        getErrorMessage(
-            error
-        );
-
+        getErrorMessage(error);
 
     return (
-
         status === 429 ||
-
         status === 500 ||
-
         status === 502 ||
-
         status === 503 ||
-
         status === 504 ||
-
-        String(status) === '429' ||
-
-        String(status) === '500' ||
-
-        String(status) === '502' ||
-
-        String(status) === '503' ||
-
-        String(status) === '504' ||
-
-        message.includes(
-            '429'
-        ) ||
-
-        message.includes(
-            '500'
-        ) ||
-
-        message.includes(
-            '502'
-        ) ||
-
-        message.includes(
-            '503'
-        ) ||
-
-        message.includes(
-            '504'
-        ) ||
-
-        message.includes(
-            'unavailable'
-        ) ||
-
-        message.includes(
-            'high demand'
-        ) ||
-
-        message.includes(
-            'overloaded'
-        ) ||
-
-        message.includes(
-            'resource exhausted'
-        ) ||
-
-        message.includes(
-            'temporarily'
-        )
-
+        message.includes('429') ||
+        message.includes('500') ||
+        message.includes('502') ||
+        message.includes('503') ||
+        message.includes('504') ||
+        message.includes('unavailable') ||
+        message.includes('high demand') ||
+        message.includes('overloaded') ||
+        message.includes('resource exhausted') ||
+        message.includes('temporarily')
     );
-
 };
 
 
 // ======================================================
-// CALL ONE GEMINI MODEL
+// BUILD CONVERSATION
 // ======================================================
 
-const callGeminiModel = async (
-
-    model,
-
+const buildConversationPrompt = (
     message,
+    history = []
+) => {
 
+    const safeHistory =
+        Array.isArray(history)
+            ? history.slice(-20)
+            : [];
+
+    const conversationHistory =
+        safeHistory
+            .filter(
+                msg =>
+                    msg &&
+                    typeof msg.text === 'string' &&
+                    msg.text.trim()
+            )
+            .map(msg => {
+
+                const role =
+                    msg.role === 'assistant'
+                        ? 'VoyageAI'
+                        : 'User';
+
+                return `${role}: ${msg.text}`;
+            })
+            .join('\n');
+
+    if (!conversationHistory) {
+        return message;
+    }
+
+    return `
+Previous conversation:
+
+${conversationHistory}
+
+Current user message:
+
+${message}
+
+Answer the current user message while
+maintaining the context of the conversation.
+`;
+};
+
+
+// ======================================================
+// STREAM ONE MODEL
+// ======================================================
+
+const streamGeminiModel = async (
+    model,
+    message,
     language,
-
-    translate
-
+    translate,
+    history,
+    onChunk
 ) => {
 
     if (!ai) {
-
         throw new Error(
-
             'GEMINI_API_KEY is not configured.'
-
         );
-
     }
 
-
     const systemPrompt =
-
         createSystemPrompt(
-
             language,
-
             translate
-
         );
 
+    const conversationPrompt =
+        buildConversationPrompt(
+            message,
+            history
+        );
 
-    const response =
+    console.log(
+        `[Chatbot] Starting stream with ${model}`
+    );
 
-        await ai.models.generateContent({
+    const stream =
+        await ai.models.generateContentStream({
 
-            model:
-
-                model,
+            model,
 
             contents:
-
-                message,
+                conversationPrompt,
 
             config: {
 
                 systemInstruction:
-
                     systemPrompt,
 
                 temperature:
-
                     0.7,
 
                 maxOutputTokens:
-
                     1000
-
             }
-
         });
 
+    let fullResponse = '';
 
-    const reply =
-
-        response?.text;
-
-
-    if (
-
-        !reply ||
-
-        !reply.trim()
-
+    for await (
+        const chunk of stream
     ) {
 
-        throw new Error(
+        const text =
+            chunk?.text || '';
 
-            `${model} returned an empty response.`
+        if (!text) {
+            continue;
+        }
 
-        );
+        fullResponse += text;
 
+        if (typeof onChunk === 'function') {
+
+            await onChunk(text);
+
+        }
     }
 
+    if (!fullResponse.trim()) {
 
-    return reply.trim();
+        throw new Error(
+            `${model} returned an empty response.`
+        );
+    }
 
+    console.log(
+        `[Chatbot] Stream completed using ${model}`
+    );
+
+    return fullResponse.trim();
 };
 
 
 // ======================================================
-// GENERATE GEMINI RESPONSE
+// STREAM GEMINI RESPONSE
 // ======================================================
 
-const generateGeminiResponse = async (
-
+const streamGeminiResponse = async (
     message,
-
     language,
-
-    translate
-
+    translate,
+    history,
+    onChunk
 ) => {
 
     if (!ai) {
-
         throw new Error(
-
             'GEMINI_API_KEY is not configured.'
-
         );
-
     }
 
-
-    let lastError =
-        null;
-
-
-    // ==================================================
-    // TRY EVERY MODEL
-    // ==================================================
+    let lastError = null;
 
     for (
-
         let modelIndex = 0;
-
         modelIndex < GEMINI_MODELS.length;
-
         modelIndex++
-
     ) {
 
         const model =
-
-            GEMINI_MODELS[
-            modelIndex
-            ];
-
+            GEMINI_MODELS[modelIndex];
 
         console.log(
-
-            `[Chatbot] Trying model ${modelIndex + 1}/${GEMINI_MODELS.length}: ${model}`
-
+            `[Chatbot] Trying streaming model ${modelIndex + 1}/${GEMINI_MODELS.length}: ${model}`
         );
 
+        let receivedChunk = false;
 
         // ==================================================
         // FIRST ATTEMPT
@@ -838,9 +525,8 @@ const generateGeminiResponse = async (
 
         try {
 
-            const reply =
-
-                await callGeminiModel(
+            const result =
+                await streamGeminiModel(
 
                     model,
 
@@ -848,106 +534,91 @@ const generateGeminiResponse = async (
 
                     language,
 
-                    translate
+                    translate,
 
+                    history,
+
+                    async chunk => {
+
+                        receivedChunk = true;
+
+                        if (
+                            typeof onChunk ===
+                            'function'
+                        ) {
+
+                            await onChunk(
+                                chunk
+                            );
+
+                        }
+                    }
                 );
 
-
             console.log(
-
                 `[Chatbot] SUCCESS using ${model}`
-
             );
 
-
-            return reply;
+            return result;
 
         } catch (error) {
 
-            lastError =
-                error;
-
+            lastError = error;
 
             console.error(
-
-                `[Chatbot] ${model} failed:`
-
+                `[Chatbot] ${model} failed:`,
+                error?.message || error
             );
 
-            console.error(
+            /*
+             * If text has already reached the frontend,
+             * do not start another model because that
+             * would duplicate part of the response.
+             */
 
-                error?.message ||
+            if (receivedChunk) {
 
-                error
+                throw error;
 
-            );
+            }
 
-
-            // ==============================================
-            // 404 / MODEL UNAVAILABLE
-            // ==============================================
-            //
-            // NEVER retry.
-            //
-            // Immediately move to next model.
-            //
+            // ==================================================
+            // MODEL UNAVAILABLE
+            // ==================================================
 
             if (
-
-                isModelUnavailableError(
-
-                    error
-
-                )
-
+                isModelUnavailableError(error)
             ) {
 
                 console.log(
-
-                    `[Chatbot] ${model} is unavailable. Switching immediately to next model.`
-
+                    `[Chatbot] ${model} unavailable. Switching to next model.`
                 );
-
 
                 continue;
 
             }
 
-
-            // ==============================================
+            // ==================================================
             // TEMPORARY ERROR
-            // ==============================================
-            //
-            // Retry the same model ONLY ONCE.
-            //
+            // ==================================================
 
             if (
-
-                isTemporaryError(
-
-                    error
-
-                )
-
+                isTemporaryError(error)
             ) {
 
                 console.log(
-
                     `[Chatbot] Temporary error on ${model}. Retrying once...`
-
                 );
 
+                await wait(1200);
 
-                await wait(
-                    1500
-                );
-
+                let retryReceivedChunk =
+                    false;
 
                 try {
 
-                    const retryReply =
-
-                        await callGeminiModel(
+                    const retryResult =
+                        await streamGeminiModel(
 
                             model,
 
@@ -955,48 +626,56 @@ const generateGeminiResponse = async (
 
                             language,
 
-                            translate
+                            translate,
 
+                            history,
+
+                            async chunk => {
+
+                                retryReceivedChunk =
+                                    true;
+
+                                if (
+                                    typeof onChunk ===
+                                    'function'
+                                ) {
+
+                                    await onChunk(
+                                        chunk
+                                    );
+
+                                }
+                            }
                         );
 
-
                     console.log(
-
                         `[Chatbot] Retry successful using ${model}`
-
                     );
 
-
-                    return retryReply;
-
+                    return retryResult;
 
                 } catch (retryError) {
 
                     lastError =
                         retryError;
 
-
                     console.error(
-
-                        `[Chatbot] Retry failed for ${model}:`
-
-                    );
-
-                    console.error(
-
+                        `[Chatbot] Retry failed for ${model}:`,
                         retryError?.message ||
-
                         retryError
-
                     );
 
+                    if (
+                        retryReceivedChunk
+                    ) {
+
+                        throw retryError;
+
+                    }
 
                     console.log(
-
-                        `[Chatbot] Moving to next model...`
-
+                        '[Chatbot] Moving to next model...'
                     );
-
 
                     continue;
 
@@ -1004,41 +683,18 @@ const generateGeminiResponse = async (
 
             }
 
-
-            // ==============================================
-            // OTHER ERROR
-            // ==============================================
-            //
-            // Don't get stuck.
-            //
-            // Move to next model.
-            //
-
             console.log(
-
                 `[Chatbot] Unexpected error from ${model}. Moving to next model...`
-
             );
-
         }
-
     }
 
-
-    // ==================================================
-    // ALL MODELS FAILED
-    // ==================================================
-
     throw (
-
         lastError ||
-
         new Error(
             'All Gemini models failed.'
         )
-
     );
-
 };
 
 
@@ -1047,119 +703,93 @@ const generateGeminiResponse = async (
 // ======================================================
 
 const getChatbotResponse = async (
-
     message,
-
     userId = null,
-
-    options = {}
-
+    options = {},
+    history = [],
+    onChunk = null
 ) => {
 
     const cleanMessage =
-
         String(
-
             message || ''
-
         ).trim();
 
+    if (!cleanMessage) {
 
-    // ==================================================
-    // EMPTY MESSAGE
-    // ==================================================
+        const response =
+            'Please enter a message and I’ll be happy to help.';
 
-    if (
+        if (
+            typeof onChunk ===
+            'function'
+        ) {
 
-        !cleanMessage
+            await onChunk(
+                response
+            );
 
-    ) {
+        }
 
-        return (
-
-            'Please enter a message and I’ll be happy to help.'
-
-        );
-
+        return response;
     }
 
-
-    // ==================================================
-    // LANGUAGE
-    // ==================================================
-
     const language =
-
         SUPPORTED_LANGUAGES.includes(
-
             options.language
-
         )
-
             ? options.language
-
             : 'English';
 
-
-    // ==================================================
-    // TRANSLATION
-    // ==================================================
-
     const translate =
-
         Boolean(
-
             options.translate
-
         );
 
-
     console.log(
-        '[Chatbot] Processing dynamic Gemini response...'
+        '[Chatbot] Processing Gemini response...'
     );
-
 
     console.log(
         '[Chatbot] Language:',
         language
     );
 
-
     console.log(
         '[Chatbot] Translation:',
         translate
     );
 
+    console.log(
+        '[Chatbot] History:',
+        Array.isArray(history)
+            ? history.length
+            : 0
+    );
 
     /*
-     * IMPORTANT:
+     * userId is intentionally not used.
      *
-     * userId is intentionally NOT used.
-     *
-     * The chatbot is completely independent
-     * from your application database.
-     *
-     * It only sends the user's question
-     * to Gemini.
+     * Chatbot is independent from the database.
      */
-
 
     try {
 
-        const reply =
+        return await streamGeminiResponse(
 
-            await generateGeminiResponse(
+            cleanMessage,
 
-                cleanMessage,
+            language,
 
-                language,
+            translate,
 
-                translate
+            Array.isArray(history)
+                ? history
+                : [],
 
-            );
+            onChunk
 
-
-        return reply;
+        );
 
     } catch (error) {
 
@@ -1173,7 +803,6 @@ const getChatbotResponse = async (
 
         console.error(
             error?.message ||
-
             error
         );
 
@@ -1181,24 +810,12 @@ const getChatbotResponse = async (
             '========================================'
         );
 
-
-        return (
-
-            "I'm having trouble connecting to my AI service right now. Please try again in a moment."
-
-        );
-
+        throw error;
     }
-
 };
 
 
-// ======================================================
-// EXPORT
-// ======================================================
-
 module.exports = {
-
-    getChatbotResponse
-
+    getChatbotResponse,
+    SUPPORTED_LANGUAGES
 };

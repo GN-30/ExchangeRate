@@ -6,10 +6,6 @@ const axios = require('axios');
 
 dotenv.config();
 
-// ======================================================
-// SERVICES
-// ======================================================
-
 const {
     getExchangeRate
 } = require('./services/exchangeRateService');
@@ -26,6 +22,7 @@ const {
 } = require('./services/locationService');
 
 const db = require('./db');
+const supabase = require('./supabase');
 
 const {
     register,
@@ -45,10 +42,16 @@ const {
 
 
 // ======================================================
-// APP SETUP
+// APP
 // ======================================================
 
-const app = express();
+const app =
+    express();
+
+
+// ======================================================
+// MIDDLEWARE
+// ======================================================
 
 app.use(
     cors({
@@ -70,12 +73,13 @@ app.use(
     })
 );
 
+
 const PORT =
     process.env.PORT || 5000;
 
 
 // ======================================================
-// HEALTH CHECK
+// HEALTH
 // ======================================================
 
 app.get(
@@ -93,16 +97,6 @@ app.get(
 
 // ======================================================
 // LOCATION SEARCH
-//
-// Used by:
-// - PlanTrip autocomplete
-// - Trends autocomplete
-//
-// Minimum 3 characters.
-// locationService handles:
-// - caching
-// - Nominatim queue
-// - 429 retry
 // ======================================================
 
 app.get(
@@ -116,7 +110,6 @@ app.get(
                     req.query.q || ''
                 ).trim();
 
-
             if (
                 query.length < 3
             ) {
@@ -125,22 +118,18 @@ app.get(
 
             }
 
-
             console.log(
                 `[Search] Searching locations for: ${query}`
             );
-
 
             const results =
                 await searchLocations(
                     query
                 );
 
-
             res.json(
                 results
             );
-
 
         } catch (error) {
 
@@ -148,7 +137,6 @@ app.get(
                 '[Search] Route error:',
                 error.message
             );
-
 
             res.status(500).json({
 
@@ -164,7 +152,7 @@ app.get(
 
 
 // ======================================================
-// ITINERARY ROUTES
+// ITINERARY
 // ======================================================
 
 const itineraryRoutes =
@@ -177,7 +165,7 @@ app.use(
 
 
 // ======================================================
-// USER TRIP HISTORY
+// HISTORY
 // ======================================================
 
 app.get(
@@ -187,37 +175,74 @@ app.get(
 
         try {
 
-            const result =
-                await db.query(
-
-                    `SELECT *
-                     FROM trips
-                     WHERE user_id = $1
-                     ORDER BY created_at DESC
-                     LIMIT 50`,
-
-                    [req.user.id]
-
-                );
-
-
-            res.json(
-                result.rows
+            console.log(
+                '[History] Fetching trips for user:',
+                req.user.id
             );
 
+
+            const {
+                data: trips,
+                error
+            } = await supabase
+                .from('trips')
+                .select('*')
+                .eq(
+                    'user_id',
+                    Number(req.user.id)
+                )
+                .order(
+                    'created_at',
+                    {
+                        ascending: false
+                    }
+                )
+                .limit(50);
+
+
+            if (error) {
+
+                console.error(
+                    '[History] Supabase error:',
+                    error
+                );
+
+                return res.status(500).json({
+
+                    error:
+                        'Failed to fetch history',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            console.log(
+                `[History] Found ${trips?.length || 0} trips`
+            );
+
+
+            return res.json(
+                trips || []
+            );
 
         } catch (error) {
 
             console.error(
-                'Trip history error:',
-                error.message
+                '[History] Error:',
+                error
             );
 
-
-            res.status(500).json({
+            return res.status(500).json({
 
                 error:
-                    'Failed to fetch history'
+                    'Failed to fetch history',
+
+                details:
+                    error.message
 
             });
 
@@ -228,7 +253,7 @@ app.get(
 
 
 // ======================================================
-// AUTH - REGISTER
+// REGISTER
 // ======================================================
 
 app.post(
@@ -243,7 +268,6 @@ app.post(
                 password
             } = req.body;
 
-
             const result =
                 await register(
                     name,
@@ -251,11 +275,9 @@ app.post(
                     password
                 );
 
-
             res.json(
                 result
             );
-
 
         } catch (err) {
 
@@ -263,7 +285,6 @@ app.post(
                 'Register error:',
                 err.message
             );
-
 
             res.status(400).json({
 
@@ -279,7 +300,7 @@ app.post(
 
 
 // ======================================================
-// AUTH - LOGIN
+// LOGIN
 // ======================================================
 
 app.post(
@@ -293,18 +314,15 @@ app.post(
                 password
             } = req.body;
 
-
             const result =
                 await login(
                     email,
                     password
                 );
 
-
             res.json(
                 result
             );
-
 
         } catch (err) {
 
@@ -312,7 +330,6 @@ app.post(
                 'Login error:',
                 err.message
             );
-
 
             res.status(400).json({
 
@@ -328,7 +345,7 @@ app.post(
 
 
 // ======================================================
-// AUTH - CURRENT USER
+// CURRENT USER
 // ======================================================
 
 app.get(
@@ -338,25 +355,48 @@ app.get(
 
         try {
 
-            const result =
-                await db.query(
+            console.log(
+                '[Auth/Me] Fetching user:',
+                req.user.id
+            );
 
-                    `SELECT
-                        id,
-                        name,
-                        email,
-                        preferences
-                     FROM users
-                     WHERE id = $1`,
 
-                    [req.user.id]
+            const {
+                data: user,
+                error
+            } = await supabase
+                .from('users')
+                .select(
+                    'id, name, email, preferences'
+                )
+                .eq(
+                    'id',
+                    Number(req.user.id)
+                )
+                .maybeSingle();
 
+
+            if (error) {
+
+                console.error(
+                    '[Auth/Me] Supabase error:',
+                    error
                 );
 
+                return res.status(500).json({
 
-            if (
-                result.rows.length === 0
-            ) {
+                    error:
+                        'Failed to fetch user',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            if (!user) {
 
                 return res.status(404).json({
 
@@ -368,23 +408,24 @@ app.get(
             }
 
 
-            res.json(
-                result.rows[0]
+            return res.json(
+                user
             );
 
-
-        } catch (err) {
+        } catch (error) {
 
             console.error(
-                'Auth/me error:',
-                err.message
+                '[Auth/Me] Error:',
+                error
             );
 
-
-            res.status(500).json({
+            return res.status(500).json({
 
                 error:
-                    'Server error'
+                    'Server error',
+
+                details:
+                    error.message
 
             });
 
@@ -395,42 +436,28 @@ app.get(
 
 
 // ======================================================
-// CHATBOT
-//
-// Supports:
-// - Normal AI travel questions
-// - User trip context
-// - User expense context
-// - Selected response language
-// - Translation mode
-//
-// Frontend sends:
-// {
-//     message: "...",
-//     language: "Tamil",
-//     translate: true
-// }
+// CHATBOT - SSE STREAMING
 // ======================================================
 
 app.post(
     '/api/chat',
     async (req, res) => {
 
+        let streamFinished = false;
+
         try {
+
+            // ==================================================
+            // TOKEN
+            // ==================================================
 
             let userId =
                 null;
-
-
-            // ==================================================
-            // GET TOKEN
-            // ==================================================
 
             const authorization =
                 req.get(
                     'Authorization'
                 );
-
 
             const token =
                 authorization &&
@@ -441,11 +468,6 @@ app.post(
                         .substring(7)
                         .trim()
                     : null;
-
-
-            // ==================================================
-            // VERIFY TOKEN
-            // ==================================================
 
             if (
                 token
@@ -463,32 +485,17 @@ app.post(
 
                         );
 
-
-                    /*
-                     * Support different possible
-                     * JWT payload names.
-                     */
-
                     userId =
                         decoded.id ||
                         decoded.userId ||
                         decoded.user_id ||
                         null;
 
-
                 } catch (tokenError) {
-
-                    /*
-                     * The chatbot can still work
-                     * for an anonymous user.
-                     */
 
                     console.warn(
                         '[Chatbot] Invalid token. Continuing as guest.'
                     );
-
-                    userId =
-                        null;
 
                 }
 
@@ -496,19 +503,16 @@ app.post(
 
 
             // ==================================================
-            // REQUEST BODY
+            // REQUEST
             // ==================================================
 
             const {
                 message,
                 language,
-                translate
+                translate,
+                history
             } = req.body;
 
-
-            // ==================================================
-            // VALIDATE MESSAGE
-            // ==================================================
 
             if (
                 !message ||
@@ -530,7 +534,29 @@ app.post(
 
 
             // ==================================================
-            // CHATBOT OPTIONS
+            // HISTORY
+            // ==================================================
+
+            const conversationHistory =
+
+                Array.isArray(history)
+
+                    ? history
+
+                        .filter(
+                            item =>
+                                item &&
+                                typeof item.text ===
+                                'string'
+                        )
+
+                        .slice(-20)
+
+                    : [];
+
+
+            // ==================================================
+            // OPTIONS
             // ==================================================
 
             const chatbotOptions = {
@@ -571,6 +597,11 @@ app.post(
             );
 
             console.log(
+                '[Chatbot] History:',
+                conversationHistory.length
+            );
+
+            console.log(
                 '[Chatbot] Message:',
                 message.trim()
             );
@@ -581,53 +612,267 @@ app.post(
 
 
             // ==================================================
-            // GET AI RESPONSE
+            // SSE HEADERS
             // ==================================================
 
-            const reply =
-                await getChatbotResponse(
+            res.status(200);
 
-                    message.trim(),
+            res.setHeader(
+                'Content-Type',
+                'text/event-stream; charset=utf-8'
+            );
 
-                    userId,
+            res.setHeader(
+                'Cache-Control',
+                'no-cache, no-transform'
+            );
 
-                    chatbotOptions
+            res.setHeader(
+                'Connection',
+                'keep-alive'
+            );
 
-                );
+            res.setHeader(
+                'X-Accel-Buffering',
+                'no'
+            );
+
+            if (
+                typeof res.flushHeaders ===
+                'function'
+            ) {
+
+                res.flushHeaders();
+
+            }
 
 
             // ==================================================
-            // RESPONSE
+            // SEND EVENT
             // ==================================================
 
-            return res.json({
+            const sendEvent = (
+                event,
+                data
+            ) => {
 
-                success:
-                    true,
+                if (
+                    res.writableEnded
+                ) {
 
-                reply
+                    return false;
 
-            });
+                }
+
+                try {
+
+                    res.write(
+                        `event: ${event}\n` +
+                        `data: ${JSON.stringify(data)}\n\n`
+                    );
+
+                    return true;
+
+                } catch (error) {
+
+                    console.error(
+                        '[Chatbot] SSE write error:',
+                        error.message
+                    );
+
+                    return false;
+
+                }
+
+            };
 
 
-        } catch (err) {
+            // ==================================================
+            // CONNECTION HANDLING
+            // ==================================================
 
-            console.error(
-                'Chatbot error:',
-                err.response?.data ||
-                err.message
+            const handleClose = () => {
+
+                if (
+                    !streamFinished
+                ) {
+
+                    console.log(
+                        '[Chatbot] Client disconnected before stream completed.'
+                    );
+
+                }
+
+            };
+
+
+            res.once(
+                'close',
+                handleClose
             );
 
 
-            return res.status(500).json({
+            // ==================================================
+            // START
+            // ==================================================
 
-                success:
-                    false,
+            sendEvent(
+                'start',
+                {
+                    success:
+                        true
+                }
+            );
 
-                error:
-                    'Chatbot error'
 
-            });
+            // ==================================================
+            // GEMINI
+            // ==================================================
+
+            await getChatbotResponse(
+
+                message.trim(),
+
+                userId,
+
+                chatbotOptions,
+
+                conversationHistory,
+
+                async chunk => {
+
+                    if (
+                        res.writableEnded
+                    ) {
+
+                        return;
+
+                    }
+
+                    sendEvent(
+                        'chunk',
+                        {
+                            text:
+                                chunk
+                        }
+                    );
+
+                }
+
+            );
+
+
+            // ==================================================
+            // DONE
+            // ==================================================
+
+            streamFinished =
+                true;
+
+            if (
+                !res.writableEnded
+            ) {
+
+                sendEvent(
+                    'done',
+                    {
+                        success:
+                            true
+                    }
+                );
+
+                /*
+                 * Give Node a moment to flush the final
+                 * SSE event before closing the response.
+                 */
+
+                setImmediate(
+                    () => {
+
+                        if (
+                            !res.writableEnded
+                        ) {
+
+                            res.end();
+
+                        }
+
+                    }
+                );
+
+            }
+
+
+        } catch (error) {
+
+            console.error(
+                '========================================'
+            );
+
+            console.error(
+                '[Chatbot] Streaming error:',
+                error?.message ||
+                error
+            );
+
+            console.error(
+                '========================================'
+            );
+
+
+            if (
+                !res.headersSent
+            ) {
+
+                return res.status(500).json({
+
+                    success:
+                        false,
+
+                    error:
+                        'Failed to process chatbot request.'
+
+                });
+
+            }
+
+
+            if (
+                !res.writableEnded
+            ) {
+
+                try {
+
+                    res.write(
+
+                        `event: error\n` +
+
+                        `data: ${JSON.stringify({
+
+                            success:
+                                false,
+
+                            error:
+                                error?.message ||
+                                'Failed to generate response.'
+
+                        })}\n\n`
+
+                    );
+
+                } catch (writeError) {
+
+                    console.error(
+                        '[Chatbot] Could not send error event:',
+                        writeError.message
+                    );
+
+                }
+
+
+                res.end();
+
+            }
 
         }
 
@@ -646,61 +891,103 @@ app.get(
 
         try {
 
+            // ==================================================
+            // LATEST TRIP
+            // ==================================================
+
             if (
                 req.params.id === 'latest'
             ) {
 
-                const result =
-                    await db.query(
+                const {
+                    data: trip,
+                    error
+                } = await supabase
+                    .from('trips')
+                    .select('*')
+                    .eq(
+                        'user_id',
+                        Number(req.user.id)
+                    )
+                    .order(
+                        'created_at',
+                        {
+                            ascending: false
+                        }
+                    )
+                    .limit(1)
+                    .maybeSingle();
 
-                        `SELECT *
-                         FROM trips
-                         WHERE user_id = $1
-                         ORDER BY created_at DESC
-                         LIMIT 1`,
 
-                        [req.user.id]
+                if (error) {
 
+                    console.error(
+                        '[Trip] Latest trip error:',
+                        error
                     );
 
+                    return res.status(500).json({
 
-                if (
-                    result.rows.length === 0
-                ) {
+                        error:
+                            'Failed to fetch latest trip',
 
-                    return res.json(
-                        null
-                    );
+                        details:
+                            error.message
+
+                    });
 
                 }
 
 
                 return res.json(
-                    result.rows[0]
+                    trip || null
                 );
 
             }
 
 
-            const result =
-                await db.query(
+            // ==================================================
+            // SPECIFIC TRIP
+            // ==================================================
 
-                    `SELECT *
-                     FROM trips
-                     WHERE id = $1
-                     AND user_id = $2`,
+            const {
+                data: trip,
+                error
+            } = await supabase
+                .from('trips')
+                .select('*')
+                .eq(
+                    'id',
+                    Number(req.params.id)
+                )
+                .eq(
+                    'user_id',
+                    Number(req.user.id)
+                )
+                .maybeSingle();
 
-                    [
-                        req.params.id,
-                        req.user.id
-                    ]
 
+            if (error) {
+
+                console.error(
+                    '[Trip] Fetch error:',
+                    error
                 );
 
+                return res.status(500).json({
 
-            if (
-                result.rows.length === 0
-            ) {
+                    error:
+                        'Failed to fetch trip',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            if (!trip) {
 
                 return res.status(404).json({
 
@@ -712,23 +999,24 @@ app.get(
             }
 
 
-            res.json(
-                result.rows[0]
+            return res.json(
+                trip
             );
 
-
-        } catch (err) {
+        } catch (error) {
 
             console.error(
-                'Trip fetch error:',
-                err.message
+                '[Trip] Error:',
+                error
             );
 
-
-            res.status(500).json({
+            return res.status(500).json({
 
                 error:
-                    'Failed to fetch trip'
+                    'Failed to fetch trip',
+
+                details:
+                    error.message
 
             });
 
@@ -739,7 +1027,11 @@ app.get(
 
 
 // ======================================================
-// EXPENSES - GET
+// EXPENSES GET
+// ======================================================
+
+// ======================================================
+// EXPENSES GET - SUPABASE
 // ======================================================
 
 app.get(
@@ -752,10 +1044,10 @@ app.get(
             const tripId =
                 req.query.tripId;
 
-
             if (
                 !tripId ||
-                tripId === 'null'
+                tripId === 'null' ||
+                tripId === 'undefined'
             ) {
 
                 return res.json([]);
@@ -763,40 +1055,80 @@ app.get(
             }
 
 
-            const result =
-                await db.query(
+            console.log(
+                '[Expenses] Fetching expenses',
+                'User:',
+                req.user.id,
+                'Trip:',
+                tripId
+            );
 
-                    `SELECT *
-                     FROM expenses
-                     WHERE user_id = $1
-                     AND trip_id = $2
-                     ORDER BY date DESC`,
 
-                    [
-                        req.user.id,
-                        tripId
-                    ]
-
+            const {
+                data: expenses,
+                error
+            } = await supabase
+                .from('expenses')
+                .select('*')
+                .eq(
+                    'user_id',
+                    Number(req.user.id)
+                )
+                .eq(
+                    'trip_id',
+                    Number(tripId)
+                )
+                .order(
+                    'date',
+                    {
+                        ascending: false
+                    }
                 );
 
 
-            res.json(
-                result.rows
+            if (error) {
+
+                console.error(
+                    '[Expenses] Supabase fetch error:',
+                    error
+                );
+
+                return res.status(500).json({
+
+                    error:
+                        'Failed to fetch expenses',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            console.log(
+                `[Expenses] Found ${expenses?.length || 0} expenses`
             );
 
 
-        } catch (err) {
+            return res.json(
+                expenses || []
+            );
+
+        } catch (error) {
 
             console.error(
-                'Expense fetch error:',
-                err.message
+                '[Expenses] Fetch error:',
+                error
             );
 
-
-            res.status(500).json({
+            return res.status(500).json({
 
                 error:
-                    'Failed'
+                    'Failed to fetch expenses',
+
+                details:
+                    error.message
 
             });
 
@@ -807,7 +1139,11 @@ app.get(
 
 
 // ======================================================
-// EXPENSES - CREATE
+// EXPENSE CREATE
+// ======================================================
+
+// ======================================================
+// EXPENSE CREATE - SUPABASE
 // ======================================================
 
 app.post(
@@ -827,6 +1163,10 @@ app.post(
             } = req.body;
 
 
+            // ==================================================
+            // VALIDATION
+            // ==================================================
+
             if (
                 !trip_id
             ) {
@@ -841,61 +1181,212 @@ app.post(
             }
 
 
-            const result =
-                await db.query(
+            if (
+                !category
+            ) {
 
-                    `INSERT INTO expenses
-                    (
-                        trip_id,
-                        user_id,
-                        category,
-                        amount_inr,
-                        amount_local,
-                        description,
-                        date
-                    )
-                    VALUES
-                    (
-                        $1,
-                        $2,
-                        $3,
-                        $4,
-                        $5,
-                        $6,
-                        $7
-                    )
-                    RETURNING *`,
+                return res.status(400).json({
 
-                    [
-                        trip_id,
-                        req.user.id,
-                        category,
-                        amount_inr,
-                        amount_local,
-                        description,
-                        date
-                    ]
+                    error:
+                        'category is required'
 
+                });
+
+            }
+
+
+            if (
+                amount_inr === undefined ||
+                amount_inr === null ||
+                Number(amount_inr) < 0
+            ) {
+
+                return res.status(400).json({
+
+                    error:
+                        'Valid amount_inr is required'
+
+                });
+
+            }
+
+
+            if (
+                amount_local === undefined ||
+                amount_local === null ||
+                Number(amount_local) < 0
+            ) {
+
+                return res.status(400).json({
+
+                    error:
+                        'Valid amount_local is required'
+
+                });
+
+            }
+
+
+            if (
+                !date
+            ) {
+
+                return res.status(400).json({
+
+                    error:
+                        'date is required'
+
+                });
+
+            }
+
+
+            // ==================================================
+            // VERIFY TRIP BELONGS TO USER
+            // ==================================================
+
+            const {
+                data: trip,
+                error: tripError
+            } = await supabase
+                .from('trips')
+                .select('id')
+                .eq(
+                    'id',
+                    Number(trip_id)
+                )
+                .eq(
+                    'user_id',
+                    Number(req.user.id)
+                )
+                .maybeSingle();
+
+
+            if (tripError) {
+
+                console.error(
+                    '[Expenses] Trip verification error:',
+                    tripError
                 );
 
+                return res.status(500).json({
 
-            res.json(
-                result.rows[0]
+                    error:
+                        'Failed to verify trip',
+
+                    details:
+                        tripError.message
+
+                });
+
+            }
+
+
+            if (!trip) {
+
+                return res.status(404).json({
+
+                    error:
+                        'Trip not found or does not belong to this user'
+
+                });
+
+            }
+
+
+            // ==================================================
+            // INSERT EXPENSE
+            // ==================================================
+
+            console.log(
+                '[Expenses] Saving expense to Supabase...'
             );
 
 
-        } catch (err) {
+            const {
+                data: expense,
+                error
+            } = await supabase
+                .from('expenses')
+                .insert({
+
+                    trip_id:
+                        Number(trip_id),
+
+                    user_id:
+                        Number(req.user.id),
+
+                    category:
+                        category,
+
+                    amount_inr:
+                        Number(amount_inr),
+
+                    amount_local:
+                        Number(amount_local),
+
+                    description:
+                        description ||
+                        null,
+
+                    date:
+                        date
+
+                })
+                .select('*')
+                .single();
+
+
+            if (error) {
+
+                console.error(
+                    '[Expenses] Supabase insert error:',
+                    error
+                );
+
+                return res.status(500).json({
+
+                    error:
+                        'Failed to save expense',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            console.log(
+                '[Expenses] Expense saved successfully.'
+            );
+
+
+            console.log(
+                '[Expenses] Expense ID:',
+                expense.id
+            );
+
+
+            return res.status(201).json(
+                expense
+            );
+
+
+        } catch (error) {
 
             console.error(
-                'Expense creation error:',
-                err.message
+                '[Expenses] Create error:',
+                error
             );
 
-
-            res.status(500).json({
+            return res.status(500).json({
 
                 error:
-                    'Failed'
+                    'Failed to create expense',
+
+                details:
+                    error.message
 
             });
 
@@ -906,7 +1397,11 @@ app.post(
 
 
 // ======================================================
-// EXPENSES - DELETE
+// EXPENSE DELETE
+// ======================================================
+
+// ======================================================
+// EXPENSE DELETE - SUPABASE
 // ======================================================
 
 app.delete(
@@ -916,89 +1411,113 @@ app.delete(
 
         try {
 
-            await db.query(
+            const expenseId =
+                Number(req.params.id);
 
-                `DELETE FROM expenses
-                 WHERE id = $1
-                 AND user_id = $2`,
 
-                [
-                    req.params.id,
-                    req.user.id
-                ]
+            if (
+                !expenseId ||
+                Number.isNaN(expenseId)
+            ) {
 
+                return res.status(400).json({
+
+                    error:
+                        'Invalid expense ID'
+
+                });
+
+            }
+
+
+            console.log(
+                '[Expenses] Deleting expense:',
+                expenseId,
+                'User:',
+                req.user.id
             );
 
 
-            res.json({
-
-                success:
-                    true
-
-            });
-
-
-        } catch (err) {
-
-            console.error(
-                'Expense delete error:',
-                err.message
-            );
-
-
-            res.status(500).json({
-
-                error:
-                    'Failed'
-
-            });
-
-        }
-
-    }
-);
+            const {
+                data: deletedExpense,
+                error
+            } = await supabase
+                .from('expenses')
+                .delete()
+                .eq(
+                    'id',
+                    expenseId
+                )
+                .eq(
+                    'user_id',
+                    Number(req.user.id)
+                )
+                .select('*')
+                .maybeSingle();
 
 
-// ======================================================
-// ALERTS - GET
-// ======================================================
+            if (error) {
 
-app.get(
-    '/api/alerts',
-    authMiddleware,
-    async (req, res) => {
-
-        try {
-
-            const result =
-                await db.query(
-
-                    `SELECT *
-                     FROM alerts
-                     WHERE user_id = $1`,
-
-                    [req.user.id]
-
+                console.error(
+                    '[Expenses] Supabase delete error:',
+                    error
                 );
 
+                return res.status(500).json({
 
-            res.json(
-                result.rows
+                    error:
+                        'Failed to delete expense',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            if (!deletedExpense) {
+
+                return res.status(404).json({
+
+                    error:
+                        'Expense not found'
+
+                });
+
+            }
+
+
+            console.log(
+                '[Expenses] Expense deleted successfully:',
+                deletedExpense.id
             );
 
 
-        } catch (err) {
+            return res.json({
+
+                success:
+                    true,
+
+                expense:
+                    deletedExpense
+
+            });
+
+        } catch (error) {
 
             console.error(
-                'Alert fetch error:',
-                err.message
+                '[Expenses] Delete error:',
+                error
             );
 
-
-            res.status(500).json({
+            return res.status(500).json({
 
                 error:
-                    'Failed'
+                    'Failed to delete expense',
+
+                details:
+                    error.message
 
             });
 
@@ -1007,9 +1526,12 @@ app.get(
     }
 );
 
+// ======================================================
+// ALERT CREATE
+// ======================================================
 
 // ======================================================
-// ALERTS - CREATE
+// CREATE ALERT - SUPABASE
 // ======================================================
 
 app.post(
@@ -1026,52 +1548,152 @@ app.post(
             } = req.body;
 
 
-            const result =
-                await db.query(
+            // ==================================================
+            // VALIDATION
+            // ==================================================
 
-                    `INSERT INTO alerts
-                    (
-                        user_id,
-                        currency_code,
-                        target_rate,
-                        condition
-                    )
-                    VALUES
-                    (
-                        $1,
-                        $2,
-                        $3,
-                        $4
-                    )
-                    RETURNING *`,
+            if (
+                !currency_code ||
+                typeof currency_code !== 'string'
+            ) {
 
-                    [
-                        req.user.id,
-                        currency_code,
-                        target_rate,
-                        condition
-                    ]
+                return res.status(400).json({
 
+                    error:
+                        'currency_code is required'
+
+                });
+
+            }
+
+
+            if (
+                target_rate === undefined ||
+                target_rate === null ||
+                Number(target_rate) <= 0
+            ) {
+
+                return res.status(400).json({
+
+                    error:
+                        'Valid target_rate is required'
+
+                });
+
+            }
+
+
+            if (
+                condition !== 'above' &&
+                condition !== 'below'
+            ) {
+
+                return res.status(400).json({
+
+                    error:
+                        "condition must be either 'above' or 'below'"
+
+                });
+
+            }
+
+
+            // ==================================================
+            // SAVE ALERT TO SUPABASE
+            // ==================================================
+
+            console.log(
+                '[Alerts] Creating alert for user:',
+                req.user.id
+            );
+
+
+            const {
+                data: alert,
+                error
+            } = await supabase
+                .from('alerts')
+                .insert({
+
+                    user_id:
+                        Number(req.user.id),
+
+                    currency_code:
+                        currency_code
+                            .trim()
+                            .toUpperCase(),
+
+                    target_rate:
+                        Number(target_rate),
+
+                    condition:
+                        condition,
+
+                    is_active:
+                        true
+
+                })
+                .select('*')
+                .single();
+
+
+            // ==================================================
+            // SUPABASE ERROR
+            // ==================================================
+
+            if (error) {
+
+                console.error(
+                    '[Alerts] Supabase insert error:',
+                    error
                 );
 
+                return res.status(500).json({
 
-            res.json(
-                result.rows[0]
+                    error:
+                        'Failed to create alert',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            // ==================================================
+            // SUCCESS
+            // ==================================================
+
+            console.log(
+                '[Alerts] Alert created successfully.'
+            );
+
+            console.log(
+                '[Alerts] Alert ID:',
+                alert.id
+            );
+
+
+            return res.status(201).json(
+                alert
             );
 
 
         } catch (err) {
 
             console.error(
-                'Alert creation error:',
-                err.message
+                '[Alerts] Alert creation error:',
+                err
             );
 
-
-            res.status(500).json({
+            return res.status(500).json({
 
                 error:
-                    'Failed'
+                    'Failed to create alert',
+
+                details:
+                    err.message
 
             });
 
@@ -1133,14 +1755,12 @@ app.post(
 
             });
 
-
         } catch (err) {
 
             console.error(
                 'Test email error:',
                 err.message
             );
-
 
             res.status(500).json({
 
@@ -1156,7 +1776,7 @@ app.post(
 
 
 // ======================================================
-// HISTORICAL EXCHANGE RATE
+// HISTORICAL RATES
 // ======================================================
 
 app.get(
@@ -1184,15 +1804,6 @@ app.get(
 
             }
 
-
-            console.log(
-                `Fetching historical rate for: ${searchTerm}`
-            );
-
-
-            // ==================================================
-            // RESOLVE CURRENCY
-            // ==================================================
 
             let currencyCode;
 
@@ -1235,19 +1846,12 @@ app.get(
                         details.currencyCode
                             .toUpperCase();
 
-
-                    console.log(
-                        `Currency resolved: ${searchTerm} -> ${currencyCode}`
-                    );
-
-
                 } catch (error) {
 
                     console.error(
                         'Currency resolution error:',
                         error.message
                     );
-
 
                     return res.status(404).json({
 
@@ -1263,15 +1867,6 @@ app.get(
 
             }
 
-
-            console.log(
-                `${searchTerm} → ${currencyCode}`
-            );
-
-
-            // ==================================================
-            // INR
-            // ==================================================
 
             if (
                 currencyCode === 'INR'
@@ -1310,10 +1905,6 @@ app.get(
             }
 
 
-            // ==================================================
-            // DATE RANGE
-            // ==================================================
-
             const today =
                 new Date();
 
@@ -1325,9 +1916,7 @@ app.get(
 
 
             const startDateObject =
-                new Date(
-                    today
-                );
+                new Date(today);
 
 
             startDateObject.setDate(
@@ -1340,15 +1929,6 @@ app.get(
                     .toISOString()
                     .split('T')[0];
 
-
-            console.log(
-                `Historical range: ${startDate} → ${endDate}`
-            );
-
-
-            // ==================================================
-            // FRANKFURTER
-            // ==================================================
 
             let response;
 
@@ -1381,7 +1961,6 @@ app.get(
                         }
 
                     );
-
 
             } catch (apiError) {
 
@@ -1448,16 +2027,6 @@ app.get(
                     ? response.data
                     : [];
 
-
-            console.log(
-                'Historical rows:',
-                rows.length
-            );
-
-
-            // ==================================================
-            // FORMAT DATA
-            // ==================================================
 
             const data =
                 rows
@@ -1531,24 +2100,16 @@ app.get(
             }
 
 
-            console.log(
-                `Returning ${data.length} historical points`
-            );
-
-
             res.json(
                 data
             );
-
 
         } catch (error) {
 
             console.error(
                 'Historical rate error:',
-                error.response?.data ||
                 error.message
             );
-
 
             res.status(500).json({
 
@@ -1567,7 +2128,71 @@ app.get(
 
 
 // ======================================================
-// SERVER START
+// 404
+// ======================================================
+
+app.use(
+    (req, res) => {
+
+        res.status(404).json({
+
+            success:
+                false,
+
+            error:
+                'API endpoint not found.'
+
+        });
+
+    }
+);
+
+
+// ======================================================
+// GLOBAL ERROR
+// ======================================================
+
+app.use(
+    (
+        error,
+        req,
+        res,
+        next
+    ) => {
+
+        console.error(
+            'Global server error:',
+            error
+        );
+
+
+        if (
+            res.headersSent
+        ) {
+
+            return next(
+                error
+            );
+
+        }
+
+
+        res.status(500).json({
+
+            success:
+                false,
+
+            error:
+                'Internal server error.'
+
+        });
+
+    }
+);
+
+
+// ======================================================
+// START
 // ======================================================
 
 app.listen(
@@ -1575,21 +2200,34 @@ app.listen(
     () => {
 
         console.log(
+            '========================================'
+        );
+
+        console.log(
+            '        VoyageAI Backend Server'
+        );
+
+        console.log(
+            '========================================'
+        );
+
+        console.log(
             `Server running on port ${PORT}`
         );
 
-
         console.log(
-            `Chatbot endpoint: POST /api/chat`
+            'Chatbot endpoint: POST /api/chat'
         );
 
-
         console.log(
-            `AI model: ${process.env.OPENAI_MODEL ||
-            'gpt-4o-mini'
+            `AI model: ${process.env.GEMINI_MODEL ||
+            'gemini-3.6-flash'
             }`
         );
 
+        console.log(
+            '========================================'
+        );
 
         startAlertWorker();
 

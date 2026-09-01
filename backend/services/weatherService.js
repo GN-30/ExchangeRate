@@ -1,154 +1,552 @@
 const axios = require('axios');
 
-const cache = new Map(); // Simple weather cache
+const cache = new Map();
 
-const getWeatherForecast = async (latitude, longitude, startDate, days) => {
-    const safeDays = parseInt(days) || 1;
-    const key = `${latitude.toFixed(2)},${longitude.toFixed(2)},${startDate},${safeDays}`;
-    if (cache.has(key)) {
+
+// ======================================================
+// GET WEATHER FORECAST
+// ======================================================
+
+const getWeatherForecast = async (
+    latitude,
+    longitude,
+    startDate,
+    days
+) => {
+
+    const safeDays =
+        Math.max(
+            1,
+            parseInt(days) || 1
+        );
+
+
+    const key =
+        `${latitude.toFixed(2)},${longitude.toFixed(2)},${startDate},${safeDays}`;
+
+
+    if (
+        cache.has(key)
+    ) {
+
+        console.log(
+            '[Weather] Cache hit.'
+        );
+
         return cache.get(key);
+
     }
 
-    const apiKey = (process.env.WEATHER_API_KEY || "").trim();
-    let forecastData = null;
 
-    if (apiKey && apiKey !== "your_api_key_here") {
+    const apiKey =
+        (
+            process.env.WEATHER_API_KEY ||
+            ''
+        ).trim();
+
+
+    let forecastData =
+        null;
+
+
+    // ==================================================
+    // OPENWEATHER
+    // ==================================================
+
+    if (
+        apiKey &&
+        apiKey !== 'your_api_key_here'
+    ) {
+
         try {
-            console.log(`[Weather] Using OpenWeatherMap API for coordinates: ${latitude}, ${longitude}`);
-            const response = await axios.get(`https://api.openweathermap.org/data/2.5/forecast`, {
-                params: {
-                    lat: latitude,
-                    lon: longitude,
-                    appid: apiKey,
-                    units: 'metric'
-                },
-                timeout: 5000
-            });
-            if (response.data && response.data.list) {
-                const list = response.data.list;
-                const dailyWeather = {};
-                
-                list.forEach(item => {
-                    const date = item.dt_txt.split(' ')[0];
-                    if (!dailyWeather[date]) {
-                        dailyWeather[date] = { temps: [], conditions: [] };
+
+            console.log(
+                `[Weather] Using OpenWeatherMap API for coordinates: ${latitude}, ${longitude}`
+            );
+
+
+            const response =
+                await axios.get(
+                    'https://api.openweathermap.org/data/2.5/forecast',
+                    {
+
+                        params: {
+
+                            lat:
+                                latitude,
+
+                            lon:
+                                longitude,
+
+                            appid:
+                                apiKey,
+
+                            units:
+                                'metric'
+
+                        },
+
+                        timeout:
+                            10000
+
                     }
-                    dailyWeather[date].temps.push(item.main.temp);
-                    dailyWeather[date].conditions.push(item.weather[0].main);
-                });
+                );
 
-                forecastData = Object.keys(dailyWeather).map((date, idx) => {
-                    const temps = dailyWeather[date].temps;
-                    const conditions = dailyWeather[date].conditions;
-                    const avgTemp = Math.round(temps.reduce((a, b) => a + b, 0) / temps.length);
-                    
-                    const conditionCounts = {};
-                    let primaryCondition = 'Clear';
-                    let maxCount = 0;
-                    conditions.forEach(cond => {
-                        conditionCounts[cond] = (conditionCounts[cond] || 0) + 1;
-                        if (conditionCounts[cond] > maxCount) {
-                            maxCount = conditionCounts[cond];
-                            primaryCondition = cond;
+
+            if (
+                response.data &&
+                response.data.list
+            ) {
+
+                const dailyWeather =
+                    {};
+
+
+                response.data.list.forEach(
+                    item => {
+
+                        const date =
+                            item.dt_txt
+                                .split(' ')[0];
+
+
+                        if (
+                            !dailyWeather[date]
+                        ) {
+
+                            dailyWeather[date] = {
+
+                                temps: [],
+
+                                minTemps: [],
+
+                                maxTemps: [],
+
+                                conditions: [],
+
+                                rainProbability: []
+
+                            };
+
                         }
-                    });
-                    
-                    return {
-                        day: idx + 1,
-                        date: date,
-                        tempCelsius: avgTemp,
-                        condition: primaryCondition,
-                        description: `Average temperature: ${avgTemp}°C with ${primaryCondition.toLowerCase()} skies.`
-                    };
-                });
-                
-                // Crop to the requested number of days
-                forecastData = forecastData.slice(0, safeDays);
+
+
+                        dailyWeather[date]
+                            .temps
+                            .push(
+                                item.main.temp
+                            );
+
+
+                        dailyWeather[date]
+                            .minTemps
+                            .push(
+                                item.main.temp_min
+                            );
+
+
+                        dailyWeather[date]
+                            .maxTemps
+                            .push(
+                                item.main.temp_max
+                            );
+
+
+                        dailyWeather[date]
+                            .conditions
+                            .push(
+                                item.weather?.[0]?.main ||
+                                'Clear'
+                            );
+
+
+                        dailyWeather[date]
+                            .rainProbability
+                            .push(
+                                Number(
+                                    item.pop || 0
+                                )
+                            );
+
+                    }
+                );
+
+
+                forecastData =
+                    Object.keys(
+                        dailyWeather
+                    )
+                        .map(
+                            (date, idx) => {
+
+                                const weather =
+                                    dailyWeather[
+                                    date
+                                    ];
+
+
+                                const average =
+                                    valuesAverage(
+                                        weather.temps
+                                    );
+
+
+                                const min =
+                                    Math.min(
+                                        ...weather.minTemps
+                                    );
+
+
+                                const max =
+                                    Math.max(
+                                        ...weather.maxTemps
+                                    );
+
+
+                                const condition =
+                                    mostCommon(
+                                        weather.conditions
+                                    );
+
+
+                                const rainProbability =
+                                    Math.round(
+                                        valuesAverage(
+                                            weather.rainProbability
+                                        ) *
+                                        100
+                                    );
+
+
+                                return {
+
+                                    day:
+                                        idx + 1,
+
+                                    date,
+
+                                    tempCelsius:
+                                        Math.round(
+                                            average
+                                        ),
+
+                                    minTempCelsius:
+                                        Math.round(
+                                            min
+                                        ),
+
+                                    maxTempCelsius:
+                                        Math.round(
+                                            max
+                                        ),
+
+                                    condition,
+
+                                    rainProbability,
+
+                                    description:
+                                        `${condition}. Average temperature ${Math.round(
+                                            average
+                                        )}°C with approximately ${rainProbability}% chance of rain.`
+
+                                };
+
+                            }
+                        )
+                        .slice(
+                            0,
+                            safeDays
+                        );
+
             }
+
         } catch (error) {
-            console.error('[Weather] OpenWeatherMap API Error:', error.message);
+
+            console.error(
+                '[Weather] OpenWeatherMap API Error:',
+                error.message
+            );
+
         }
+
     }
 
-    // Fallback: Generate seasonal weather patterns based on month
-    if (!forecastData || forecastData.length === 0) {
-        console.log(`[Weather] Generating seasonal forecast fallback...`);
-        const travelMonth = new Date(startDate || Date.now()).getMonth(); // 0-11
-        let baseTemp = 25;
-        let mainCondition = 'Clear';
-        let description = 'Sunny and clear skies.';
-        
-        const isIndia = latitude > 8 && latitude < 37 && longitude > 68 && longitude < 97;
-        const isSouthernHemisphere = latitude < 0;
 
-        if (isIndia) {
-            if (travelMonth >= 5 && travelMonth <= 8) { // June - Sept
-                baseTemp = 28;
-                mainCondition = 'Rain';
-                description = 'Monsoon rains, high humidity, overcast skies.';
-            } else if (travelMonth >= 10 || travelMonth <= 1) { // Nov - Feb
-                baseTemp = 20;
-                mainCondition = 'Clear';
-                description = 'Pleasant weather, clear sunny skies, cool breeze.';
-            } else { // Mar - May (Hot)
-                baseTemp = 35;
-                mainCondition = 'Clouds';
-                description = 'Hot summer days, partly cloudy skies.';
-            }
-        } else {
-            const adjustedMonth = isSouthernHemisphere ? (travelMonth + 6) % 12 : travelMonth;
-            if (adjustedMonth >= 5 && adjustedMonth <= 8) { // Summer
-                baseTemp = 26;
-                mainCondition = 'Clear';
-                description = 'Warm summer day, bright and sunny.';
-            } else if (adjustedMonth >= 11 || adjustedMonth <= 1) { // Winter
-                baseTemp = 5;
-                mainCondition = 'Clouds';
-                description = 'Chilly winter day, overcast skies.';
-            } else { // Spring / Autumn
-                baseTemp = 15;
-                mainCondition = 'Clouds';
-                description = 'Mild weather, partly cloudy skies.';
-            }
-        }
+    // ==================================================
+    // FALLBACK
+    // ==================================================
 
-        forecastData = [];
-        const start = new Date(startDate || Date.now());
-        
-        for (let i = 1; i <= safeDays; i++) {
-            const currentDate = new Date(start);
-            currentDate.setDate(start.getDate() + i - 1);
-            
-            // Format to YYYY-MM-DD
-            const yyyy = currentDate.getFullYear();
-            const mm = String(currentDate.getMonth() + 1).padStart(2, '0');
-            const dd = String(currentDate.getDate()).padStart(2, '0');
-            const dateStr = `${yyyy}-${mm}-${dd}`;
-            
-            const dailyTemp = Math.round(baseTemp + (Math.random() * 4 - 2));
-            let dayCondition = mainCondition;
-            let dayDesc = description;
-            
-            if (mainCondition === 'Clear' && Math.random() < 0.2) {
-                dayCondition = 'Clouds';
-                dayDesc = 'Partly cloudy with mild conditions.';
-            } else if (mainCondition === 'Rain' && Math.random() < 0.25) {
-                dayCondition = 'Clouds';
-                dayDesc = 'Brief break from rains, overcast and humid.';
-            }
+    if (
+        !forecastData ||
+        forecastData.length === 0
+    ) {
 
-            forecastData.push({
-                day: i,
-                date: dateStr,
-                tempCelsius: dailyTemp,
-                condition: dayCondition,
-                description: dayDesc
-            });
-        }
+        console.log(
+            '[Weather] Generating deterministic seasonal fallback.'
+        );
+
+
+        forecastData =
+            generateSeasonalForecast(
+                latitude,
+                longitude,
+                startDate,
+                safeDays
+            );
+
     }
 
-    cache.set(key, forecastData);
+
+    cache.set(
+        key,
+        forecastData
+    );
+
+
     return forecastData;
+
 };
 
-module.exports = { getWeatherForecast };
+
+// ======================================================
+// AVERAGE
+// ======================================================
+
+const valuesAverage = (
+    values
+) => {
+
+    if (
+        !values ||
+        values.length === 0
+    ) {
+
+        return 0;
+
+    }
+
+
+    return (
+        values.reduce(
+            (a, b) =>
+                a + b,
+            0
+        ) /
+        values.length
+    );
+
+};
+
+
+// ======================================================
+// MOST COMMON
+// ======================================================
+
+const mostCommon = (
+    values
+) => {
+
+    const counts =
+        {};
+
+
+    for (
+        const value of values
+    ) {
+
+        counts[value] =
+            (
+                counts[value] ||
+                0
+            ) + 1;
+
+    }
+
+
+    return Object.keys(
+        counts
+    )
+        .sort(
+            (a, b) =>
+                counts[b] -
+                counts[a]
+        )[0] ||
+        'Clear';
+
+};
+
+
+// ======================================================
+// SEASONAL FALLBACK
+// ======================================================
+
+const generateSeasonalForecast = (
+    latitude,
+    longitude,
+    startDate,
+    days
+) => {
+
+    const date =
+        new Date(
+            startDate ||
+            Date.now()
+        );
+
+
+    const month =
+        date.getMonth();
+
+
+    const isIndia =
+        latitude > 8 &&
+        latitude < 37 &&
+        longitude > 68 &&
+        longitude < 97;
+
+
+    let baseTemp =
+        25;
+
+    let condition =
+        'Clear';
+
+    let description =
+        'Generally pleasant conditions.';
+
+
+    if (
+        isIndia
+    ) {
+
+        if (
+            month >= 5 &&
+            month <= 8
+        ) {
+
+            baseTemp =
+                28;
+
+            condition =
+                'Rain';
+
+            description =
+                'Monsoon conditions with possible rain and cloudy skies.';
+
+        } else if (
+            month >= 10 ||
+            month <= 1
+        ) {
+
+            baseTemp =
+                20;
+
+            condition =
+                'Clear';
+
+            description =
+                'Generally pleasant and cooler conditions.';
+
+        } else {
+
+            baseTemp =
+                32;
+
+            condition =
+                'Clouds';
+
+            description =
+                'Warm conditions with partly cloudy skies.';
+
+        }
+
+    }
+
+
+    const forecast =
+        [];
+
+
+    for (
+        let i = 0;
+        i < days;
+        i++
+    ) {
+
+        const currentDate =
+            new Date(date);
+
+
+        currentDate.setDate(
+            date.getDate() + i
+        );
+
+
+        const yyyy =
+            currentDate
+                .getFullYear();
+
+
+        const mm =
+            String(
+                currentDate.getMonth() + 1
+            )
+                .padStart(
+                    2,
+                    '0'
+                );
+
+
+        const dd =
+            String(
+                currentDate.getDate()
+            )
+                .padStart(
+                    2,
+                    '0'
+                );
+
+
+        const dateStr =
+            `${yyyy}-${mm}-${dd}`;
+
+
+        forecast.push({
+
+            day:
+                i + 1,
+
+            date:
+                dateStr,
+
+            tempCelsius:
+                baseTemp,
+
+            minTempCelsius:
+                baseTemp - 3,
+
+            maxTempCelsius:
+                baseTemp + 3,
+
+            condition,
+
+            rainProbability:
+                condition === 'Rain'
+                    ? 60
+                    : 10,
+
+            description
+
+        });
+
+    }
+
+
+    return forecast;
+
+};
+
+
+module.exports = {
+    getWeatherForecast
+};

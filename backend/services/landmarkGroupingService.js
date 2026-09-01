@@ -4,48 +4,95 @@ const {
 
 
 // ============================================================
-// CALCULATE CENTER OF LANDMARKS
+// CALCULATE CENTER
 // ============================================================
 
-const calculateCenter = (landmarks) => {
+const calculateCenter = (
+    landmarks
+) => {
 
-    if (!landmarks.length) {
+    if (
+        !Array.isArray(landmarks) ||
+        !landmarks.length
+    ) {
+
         return null;
+
     }
 
-    const valid = landmarks.filter(
-        place =>
-            place.lat !== undefined &&
-            place.lon !== undefined
-    );
 
-    if (!valid.length) {
+    const valid =
+        landmarks.filter(
+            place =>
+                Number.isFinite(
+                    Number(
+                        place.lat ??
+                        place.latitude
+                    )
+                ) &&
+                Number.isFinite(
+                    Number(
+                        place.lon ??
+                        place.longitude
+                    )
+                )
+        );
+
+
+    if (
+        !valid.length
+    ) {
+
         return null;
+
     }
+
 
     const lat =
         valid.reduce(
-            (sum, place) =>
-                sum + Number(place.lat),
+            (
+                sum,
+                place
+            ) =>
+                sum +
+                Number(
+                    place.lat ??
+                    place.latitude
+                ),
             0
-        ) / valid.length;
+        ) /
+        valid.length;
+
 
     const lon =
         valid.reduce(
-            (sum, place) =>
-                sum + Number(place.lon),
+            (
+                sum,
+                place
+            ) =>
+                sum +
+                Number(
+                    place.lon ??
+                    place.longitude
+                ),
             0
-        ) / valid.length;
+        ) /
+        valid.length;
+
 
     return {
+
         lat,
+
         lon
+
     };
+
 };
 
 
 // ============================================================
-// ADD DISTANCE FROM DESTINATION CENTER
+// ADD DISTANCE FROM CENTER
 // ============================================================
 
 const calculateLandmarkDistances = (
@@ -53,29 +100,108 @@ const calculateLandmarkDistances = (
     center
 ) => {
 
-    return landmarks.map(place => {
+    return landmarks.map(
+        place => {
 
-        const distance =
-            haversineDistance(
-                center.lat,
-                center.lon,
-                Number(place.lat),
-                Number(place.lon)
-            );
-
-        return {
-            ...place,
-            distanceFromCenter:
+            const lat =
                 Number(
-                    distance.toFixed(2)
-                )
-        };
-    });
+                    place.lat ??
+                    place.latitude
+                );
+
+
+            const lon =
+                Number(
+                    place.lon ??
+                    place.longitude
+                );
+
+
+            const distance =
+                haversineDistance(
+                    center.lat,
+                    center.lon,
+                    lat,
+                    lon
+                );
+
+
+            return {
+
+                ...place,
+
+                distanceFromCenter:
+                    Number(
+                        distance.toFixed(2)
+                    )
+
+            };
+
+        }
+    );
+
 };
 
 
 // ============================================================
-// GROUP LANDMARKS PROGRESSIVELY
+// NORMALIZE NAME
+// ============================================================
+
+const normalizeName = (
+    name
+) => {
+
+    return String(
+        name || ''
+    )
+        .trim()
+        .toLowerCase()
+        .replace(
+            /\s+/g,
+            ' '
+        );
+
+};
+
+
+// ============================================================
+// POPULARITY SCORE
+// ============================================================
+
+const getPopularityScore = (
+    place
+) => {
+
+    const popularity =
+        Number(
+            place.popularityScore
+        );
+
+
+    if (
+        Number.isFinite(
+            popularity
+        )
+    ) {
+
+        return popularity;
+
+    }
+
+
+    const importance =
+        Number(
+            place.importance
+        ) || 0;
+
+
+    return importance * 100;
+
+};
+
+
+// ============================================================
+// GROUP LANDMARKS
 // ============================================================
 
 const groupLandmarksByDistance = (
@@ -83,18 +209,30 @@ const groupLandmarksByDistance = (
     days
 ) => {
 
-    if (!landmarks.length) {
+    if (
+        !Array.isArray(landmarks) ||
+        !landmarks.length
+    ) {
+
         return [];
+
     }
+
 
     const center =
         calculateCenter(
             landmarks
         );
 
-    if (!center) {
+
+    if (
+        !center
+    ) {
+
         return [];
+
     }
+
 
     const places =
         calculateLandmarkDistances(
@@ -103,31 +241,57 @@ const groupLandmarksByDistance = (
         );
 
 
-    // --------------------------------------------------------
-    // Sort nearest → farthest
-    // --------------------------------------------------------
-
-    places.sort(
-        (a, b) =>
-            a.distanceFromCenter -
-            b.distanceFromCenter
-    );
-
-
-    const totalPlaces =
-        places.length;
-
-
     const numberOfDays =
         Math.max(
             1,
-            Number(days)
+            Number(days) || 1
         );
 
 
-    // --------------------------------------------------------
-    // Determine how many places per day
-    // --------------------------------------------------------
+    // ========================================================
+    // SORT BY POPULARITY
+    // ========================================================
+
+    places.sort(
+        (
+            a,
+            b
+        ) => {
+
+            const popularityDifference =
+                getPopularityScore(b) -
+                getPopularityScore(a);
+
+
+            /*
+             * Popularity is the main factor.
+             *
+             * Distance is only used as a tie breaker.
+             */
+
+            if (
+                Math.abs(
+                    popularityDifference
+                ) > 10
+            ) {
+
+                return popularityDifference;
+
+            }
+
+
+            return (
+                a.distanceFromCenter -
+                b.distanceFromCenter
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // CREATE DAY GROUPS
+    // ========================================================
 
     const groups =
         Array.from(
@@ -139,49 +303,37 @@ const groupLandmarksByDistance = (
         );
 
 
+    // ========================================================
+    // DETERMINE NUMBER OF PLACES
+    // ========================================================
+
+    const totalPlaces =
+        places.length;
+
+
     /*
-     * We intentionally put more nearby places
-     * into the first days.
-     *
-     * Example:
-     *
-     * 15 places / 7 days
-     *
-     * Day 1 → nearest
-     * Day 2 → nearest
-     * Day 3 → slightly farther
-     * Day 4 → farther
-     * ...
+     * We don't want one day to receive
+     * all the famous places and another
+     * day to receive nothing.
      */
 
-
-    const weights = [];
-
-    for (
-        let i = 0;
-        i < numberOfDays;
-        i++
-    ) {
-
-        // First days receive smaller
-        // distance ranges.
-
-        const weight =
-            1 + i * 0.35;
-
-        weights.push(weight);
-    }
-
-
-    const weightTotal =
-        weights.reduce(
-            (sum, value) =>
-                sum + value,
-            0
+    const basePlacesPerDay =
+        Math.floor(
+            totalPlaces /
+            numberOfDays
         );
 
 
-    let assigned = 0;
+    let remainder =
+        totalPlaces %
+        numberOfDays;
+
+
+    // ========================================================
+    // FIRST PASS
+    // ========================================================
+
+    let index = 0;
 
 
     for (
@@ -191,79 +343,144 @@ const groupLandmarksByDistance = (
     ) {
 
         let count =
-            Math.round(
+            basePlacesPerDay;
+
+
+        if (
+            remainder > 0
+        ) {
+
+            count++;
+
+            remainder--;
+
+        }
+
+
+        /*
+         * If there are fewer places than days,
+         * some days remain empty.
+         */
+
+        for (
+            let i = 0;
+            i < count;
+            i++
+        ) {
+
+            if (
+                index >= totalPlaces
+            ) {
+
+                break;
+
+            }
+
+
+            groups[day].push(
+                places[index]
+            );
+
+
+            index++;
+
+        }
+
+    }
+
+
+    // ========================================================
+    // IMPROVE GEOGRAPHICAL ORDER
+    // ========================================================
+
+    groups.forEach(
+        group => {
+
+            if (
+                group.length <= 1
+            ) {
+
+                return;
+
+            }
+
+
+            /*
+             * Keep the most popular attraction
+             * first, then order remaining places
+             * geographically around it.
+             */
+
+            group.sort(
                 (
-                    weights[day] /
-                    weightTotal
-                ) *
-                totalPlaces
+                    a,
+                    b
+                ) => {
+
+                    const popularityDifference =
+                        getPopularityScore(b) -
+                        getPopularityScore(a);
+
+
+                    if (
+                        Math.abs(
+                            popularityDifference
+                        ) > 10
+                    ) {
+
+                        return popularityDifference;
+
+                    }
+
+
+                    return (
+                        a.distanceFromCenter -
+                        b.distanceFromCenter
+                    );
+
+                }
             );
 
-
-        // Minimum one place when possible
-
-        if (
-            count < 1 &&
-            assigned < totalPlaces
-        ) {
-            count = 1;
         }
+    );
 
 
-        // Don't exceed available places
+    // ========================================================
+    // LOGGING
+    // ========================================================
 
-        count =
-            Math.min(
-                count,
-                totalPlaces - assigned
+    groups.forEach(
+        (
+            group,
+            dayIndex
+        ) => {
+
+            console.log(
+                `\n[Geographic Plan] Day ${dayIndex + 1}`
             );
 
 
-        groups[day] =
-            places.slice(
-                assigned,
-                assigned + count
+            group.forEach(
+                place => {
+
+                    console.log(
+                        `  ${place.name} | ${place.distanceFromCenter} km | popularity ${getPopularityScore(place)}`
+                    );
+
+                }
             );
 
-
-        assigned += count;
-
-
-        if (
-            assigned >= totalPlaces
-        ) {
-            break;
         }
-    }
-
-
-    // --------------------------------------------------------
-    // If anything remains, distribute it
-    // --------------------------------------------------------
-
-    let remaining =
-        places.slice(assigned);
-
-
-    let index = 0;
-
-    while (
-        remaining.length > 0
-    ) {
-
-        groups[index %
-            numberOfDays].push(
-                remaining.shift()
-            );
-
-        index++;
-    }
+    );
 
 
     return groups;
+
 };
 
 
 module.exports = {
+
     groupLandmarksByDistance
+
 };

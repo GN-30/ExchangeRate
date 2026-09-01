@@ -1,53 +1,309 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../db');
+const supabase = require('../supabase');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret_key';
 
-const register = async (name, email, password) => {
-    // Check if user exists
-    const userCheck = await db.query('SELECT id FROM users WHERE email = $1', [email]);
-    if (userCheck.rows.length > 0) {
-        throw new Error('User already exists');
-    }
+// ======================================================
+// JWT SECRET
+// ======================================================
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+const JWT_SECRET = process.env.JWT_SECRET;
 
-    // Create user
-    const result = await db.query(
-        'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email',
-        [name, email, hashedPassword]
+if (!JWT_SECRET) {
+    throw new Error(
+        'JWT_SECRET is missing from .env'
     );
+}
 
-    const user = result.rows[0];
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
-    return { user, token };
-};
+// ======================================================
+// REGISTER
+// ======================================================
 
-const login = async (email, password) => {
-    // Check if user exists
-    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (result.rows.length === 0) {
-        throw new Error('Invalid credentials');
+const register = async (
+    name,
+    email,
+    password
+) => {
+
+    try {
+
+        // --------------------------------------------------
+        // Check if user already exists
+        // --------------------------------------------------
+
+        const {
+            data: existingUser,
+            error: checkError
+        } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+
+
+        if (checkError) {
+
+            console.error(
+                'Supabase user check error:',
+                checkError
+            );
+
+            throw new Error(
+                'Unable to check user'
+            );
+
+        }
+
+
+        if (existingUser) {
+
+            throw new Error(
+                'User already exists'
+            );
+
+        }
+
+
+        // --------------------------------------------------
+        // Hash password
+        // --------------------------------------------------
+
+        const salt =
+            await bcrypt.genSalt(10);
+
+        const hashedPassword =
+            await bcrypt.hash(
+                password,
+                salt
+            );
+
+
+        // --------------------------------------------------
+        // Create user in Supabase
+        // --------------------------------------------------
+
+        const {
+            data: user,
+            error: insertError
+        } = await supabase
+            .from('users')
+            .insert([
+                {
+                    name: name,
+                    email: email,
+                    password_hash: hashedPassword,
+                    preferences: {}
+                }
+            ])
+            .select(
+                'id, name, email, preferences'
+            )
+            .single();
+
+
+        if (insertError) {
+
+            console.error(
+                'Supabase user creation error:',
+                insertError
+            );
+
+
+            // Duplicate email
+            if (
+                insertError.code === '23505'
+            ) {
+
+                throw new Error(
+                    'User already exists'
+                );
+
+            }
+
+
+            throw new Error(
+                'Unable to create user'
+            );
+
+        }
+
+
+        // --------------------------------------------------
+        // Generate JWT
+        // --------------------------------------------------
+
+        const token =
+            jwt.sign(
+                {
+                    id: user.id
+                },
+                JWT_SECRET,
+                {
+                    expiresIn: '7d'
+                }
+            );
+
+
+        // --------------------------------------------------
+        // Return
+        // --------------------------------------------------
+
+        return {
+
+            user: user,
+
+            token: token
+
+        };
+
+    } catch (error) {
+
+        console.error(
+            'Register error:',
+            error
+        );
+
+        throw error;
+
     }
 
-    const user = result.rows[0];
-
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-        throw new Error('Invalid credentials');
-    }
-
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '7d' });
-
-    return { 
-        user: { id: user.id, name: user.name, email: user.email, preferences: user.preferences }, 
-        token 
-    };
 };
 
-module.exports = { register, login };
+
+// ======================================================
+// LOGIN
+// ======================================================
+
+const login = async (
+    email,
+    password
+) => {
+
+    try {
+
+        // --------------------------------------------------
+        // Find user in Supabase
+        // --------------------------------------------------
+
+        const {
+            data: user,
+            error: userError
+        } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .maybeSingle();
+
+
+        if (userError) {
+
+            console.error(
+                'Supabase login query error:',
+                userError
+            );
+
+            throw new Error(
+                'Unable to login'
+            );
+
+        }
+
+
+        // --------------------------------------------------
+        // User doesn't exist
+        // --------------------------------------------------
+
+        if (!user) {
+
+            throw new Error(
+                'Invalid credentials'
+            );
+
+        }
+
+
+        // --------------------------------------------------
+        // Check password
+        // --------------------------------------------------
+
+        const isMatch =
+            await bcrypt.compare(
+                password,
+                user.password_hash
+            );
+
+
+        if (!isMatch) {
+
+            throw new Error(
+                'Invalid credentials'
+            );
+
+        }
+
+
+        // --------------------------------------------------
+        // Generate JWT
+        // --------------------------------------------------
+
+        const token =
+            jwt.sign(
+                {
+                    id: user.id
+                },
+                JWT_SECRET,
+                {
+                    expiresIn: '7d'
+                }
+            );
+
+
+        // --------------------------------------------------
+        // Return user
+        // --------------------------------------------------
+
+        return {
+
+            user: {
+
+                id: user.id,
+
+                name: user.name,
+
+                email: user.email,
+
+                preferences:
+                    user.preferences
+
+            },
+
+            token: token
+
+        };
+
+    } catch (error) {
+
+        console.error(
+            'Login error:',
+            error
+        );
+
+        throw error;
+
+    }
+
+};
+
+
+// ======================================================
+// EXPORT
+// ======================================================
+
+module.exports = {
+
+    register,
+
+    login
+
+};

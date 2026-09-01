@@ -378,10 +378,6 @@ const getCountryAndCurrency =
             cleanPlace.toLowerCase();
 
 
-        // ==================================================
-        // CACHE
-        // ==================================================
-
         const cached =
             locationCache.get(
                 cacheKey
@@ -406,10 +402,6 @@ const getCountryAndCurrency =
 
 
         try {
-
-            // ==================================================
-            // NOMINATIM
-            // ==================================================
 
             const geoResponse =
                 await nominatimRequest(
@@ -447,16 +439,6 @@ const getCountryAndCurrency =
             }
 
 
-            /*
-             * --------------------------------------------------
-             * IMPORTANT
-             *
-             * Prefer the first meaningful location result.
-             *
-             * We DO NOT use country as resolvedName.
-             * --------------------------------------------------
-             */
-
             const location =
                 geoResponse.data[0];
 
@@ -488,10 +470,6 @@ const getCountryAndCurrency =
                 `Nominatim: ${cleanPlace} -> ${countryCode}`
             );
 
-
-            // ==================================================
-            // CURRENCY
-            // ==================================================
 
             let currencyCode =
                 countryCurrencyMap[
@@ -555,15 +533,6 @@ const getCountryAndCurrency =
                 currencyCode.toUpperCase();
 
 
-            console.log(
-                `Currency resolved: ${countryCode} -> ${currencyCode}`
-            );
-
-
-            // ==================================================
-            // PARENT LOCATION
-            // ==================================================
-
             const parentLocation =
                 address.city ||
                 address.town ||
@@ -572,28 +541,6 @@ const getCountryAndCurrency =
                 address.county ||
                 countryName;
 
-
-            // ==================================================
-            // RESOLVED PLACE
-            // ==================================================
-
-            /*
-             * IMPORTANT FIX
-             *
-             * Do NOT blindly use:
-             *
-             * location.display_name.split(',')[0]
-             *
-             * because Nominatim can return a result where
-             * the first component is not the place selected
-             * by the user.
-             *
-             * We first try the actual Nominatim `name`.
-             * If unavailable, use namedetails.
-             * If still unavailable, use the original query.
-             *
-             * Most importantly, NEVER fall back to countryName.
-             */
 
             const nominatimName =
                 String(
@@ -608,12 +555,6 @@ const getCountryAndCurrency =
                 cleanPlace;
 
 
-            /*
-             * If Nominatim somehow returns the country itself
-             * as the name, preserve the user's original search
-             * instead of saving the country.
-             */
-
             const safeResolvedName =
                 (
                     resolvedName.toLowerCase() ===
@@ -625,60 +566,17 @@ const getCountryAndCurrency =
                     : resolvedName;
 
 
-            console.log(
-                '[Location Service] Original place:',
-                cleanPlace
-            );
-
-
-            console.log(
-                '[Location Service] Nominatim name:',
-                nominatimName
-            );
-
-
-            console.log(
-                '[Location Service] Final resolved place:',
-                safeResolvedName
-            );
-
-
-            console.log(
-                '[Location Service] Country:',
-                countryName
-            );
-
-
-            // ==================================================
-            // RESULT
-            // ==================================================
-
             const result = {
 
-                /*
-                 * Country information
-                 */
                 countryCode,
 
                 countryName,
 
-
-                /*
-                 * ACTUAL PLACE
-                 */
                 resolvedName:
                     safeResolvedName,
 
-
-                /*
-                 * Parent city/town/county
-                 */
                 parentLocation,
 
-
-                /*
-                 * Currency
-                 */
                 currencyCode,
 
                 currencySymbol:
@@ -687,16 +585,11 @@ const getCountryAndCurrency =
                     ] ||
                     currencyCode,
 
-
                 isIndia:
                     countryCode === 'IN'
 
             };
 
-
-            // ==================================================
-            // CACHE
-            // ==================================================
 
             locationCache.set(
                 cacheKey,
@@ -756,10 +649,6 @@ const searchLocations =
             cleanQuery.toLowerCase();
 
 
-        // ==================================================
-        // CACHE
-        // ==================================================
-
         const cached =
             searchCache.get(
                 cacheKey
@@ -773,22 +662,12 @@ const searchLocations =
             CACHE_DURATION
         ) {
 
-            console.log(
-                `Search cache hit: ${cleanQuery}`
-            );
-
-
             return cached.data;
 
         }
 
 
         try {
-
-            console.log(
-                `Nominatim search: ${cleanQuery}`
-            );
-
 
             const response =
                 await nominatimRequest(
@@ -826,12 +705,6 @@ const searchLocations =
                             {};
 
 
-                        /*
-                         * Prefer Nominatim's actual name.
-                         * This is what the frontend should
-                         * send back as the selected place.
-                         */
-
                         const placeName =
                             String(
                                 item.name ||
@@ -847,10 +720,6 @@ const searchLocations =
                             display_name:
                                 item.display_name,
 
-                            /*
-                             * IMPORTANT:
-                             * This is the actual place name.
-                             */
                             name:
                                 placeName,
 
@@ -877,11 +746,6 @@ const searchLocations =
                                 address.municipality ||
                                 '',
 
-                            /*
-                             * Useful if the frontend
-                             * wants the complete selected
-                             * location object.
-                             */
                             place:
                                 placeName
 
@@ -890,10 +754,6 @@ const searchLocations =
                     }
                 );
 
-
-            // ==================================================
-            // CACHE
-            // ==================================================
 
             searchCache.set(
                 cacheKey,
@@ -929,7 +789,461 @@ const searchLocations =
 
 
 // ======================================================
-// LANDMARKS
+// LANDMARK NAME VALIDATION
+// ======================================================
+
+const isInvalidLandmarkName = (
+    name
+) => {
+
+    if (
+        !name ||
+        typeof name !== 'string'
+    ) {
+
+        return true;
+
+    }
+
+
+    const value =
+        name.trim();
+
+
+    if (
+        value.length < 3
+    ) {
+
+        return true;
+
+    }
+
+
+    // Road/internal IDs
+    if (
+        /^(MDR|NH|SH|MH|MP|UP|RJ|DL|KA|TN|KL|AP|TS|GJ|HR|PB|BR|WB|OD|JH|CG|UK|HP|JK|GA|AS|POI|LOC|REF|ID|ODR|DR)[-_]?\d+$/i.test(
+            value
+        )
+    ) {
+
+        return true;
+
+    }
+
+
+    // Generic IDs
+    if (
+        /^[A-Z]{2,12}[-_]?\d{1,8}$/i.test(
+            value
+        )
+    ) {
+
+        return true;
+
+    }
+
+
+    // Numeric only
+    if (
+        /^\d+$/.test(value)
+    ) {
+
+        return true;
+
+    }
+
+
+    return false;
+
+};
+
+
+// ======================================================
+// LANDMARK VALIDATION
+// ======================================================
+
+const isValidLandmark = (
+    item
+) => {
+
+    if (
+        !item ||
+        typeof item !== 'object'
+    ) {
+
+        return false;
+
+    }
+
+
+    const displayName =
+        String(
+            item.display_name ||
+            ''
+        ).trim();
+
+
+    const name =
+        String(
+            item.name ||
+            item.namedetails?.name ||
+            displayName.split(',')[0] ||
+            ''
+        ).trim();
+
+
+    if (
+        isInvalidLandmarkName(name)
+    ) {
+
+        return false;
+
+    }
+
+
+    const latitude =
+        Number(
+            item.lat
+        );
+
+
+    const longitude =
+        Number(
+            item.lon
+        );
+
+
+    if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude)
+    ) {
+
+        return false;
+
+    }
+
+
+    const itemClass =
+        String(
+            item.class ||
+            ''
+        ).toLowerCase();
+
+
+    const itemType =
+        String(
+            item.type ||
+            ''
+        ).toLowerCase();
+
+
+    // ==================================================
+    // ROAD FILTER
+    // ==================================================
+
+    const roadTypes = [
+
+        'road',
+        'residential',
+        'secondary',
+        'tertiary',
+        'primary',
+        'motorway',
+        'trunk',
+        'unclassified',
+        'service',
+        'track',
+        'path',
+        'footway',
+        'cycleway',
+        'pedestrian',
+        'living_street'
+
+    ];
+
+
+    if (
+        itemClass === 'highway' ||
+        roadTypes.includes(itemType)
+    ) {
+
+        return false;
+
+    }
+
+
+    // ==================================================
+    // BAD CLASSES
+    // ==================================================
+
+    const rejectedClasses = [
+
+        'boundary',
+        'railway',
+        'aeroway',
+        'power'
+
+    ];
+
+
+    if (
+        rejectedClasses.includes(itemClass)
+    ) {
+
+        return false;
+
+    }
+
+
+    // ==================================================
+    // BLACKLIST
+    // ==================================================
+
+    const blacklist = [
+
+        'road',
+        'highway',
+        'street',
+        'lane',
+        'station',
+        'bus stop',
+        'bus stand',
+        'train',
+        'metro',
+        'airport',
+        'school',
+        'college',
+        'university',
+        'office',
+        'company',
+        'shop',
+        'store',
+        'mall',
+        'market',
+        'bank',
+        'atm',
+        'fuel',
+        'petrol',
+        'residential',
+        'apartment',
+        'hospital',
+        'clinic',
+        'parking',
+        'garage',
+        'hotel',
+        'motel',
+        'hostel',
+        'resort',
+        'lodge',
+        'villa',
+        'guest house',
+        'restaurant',
+        'cafe',
+        'bar',
+        'pharmacy',
+        'masjid',
+        'mosque'
+
+    ];
+
+
+    const fullName =
+        displayName.toLowerCase();
+
+
+    const isBlacklisted =
+        blacklist.some(
+            word =>
+                fullName.includes(word) ||
+                name.toLowerCase().includes(word)
+        );
+
+
+    if (
+        isBlacklisted
+    ) {
+
+        return false;
+
+    }
+
+
+    // ==================================================
+    // TOURIST TYPES
+    // ==================================================
+
+    const touristClasses = [
+
+        'tourism',
+        'historic',
+        'heritage',
+        'leisure',
+        'natural'
+
+    ];
+
+
+    const touristTypes = [
+
+        'attraction',
+        'museum',
+        'monument',
+        'viewpoint',
+        'temple',
+        'shrine',
+        'church',
+        'cathedral',
+        'park',
+        'garden',
+        'waterfall',
+        'memorial',
+        'heritage',
+        'ruins',
+        'archaeological_site'
+
+    ];
+
+
+    const isTouristClass =
+        touristClasses.includes(
+            itemClass
+        );
+
+
+    const isTouristType =
+        touristTypes.includes(
+            itemType
+        );
+
+
+    if (
+        !isTouristClass &&
+        !isTouristType
+    ) {
+
+        return false;
+
+    }
+
+
+    return true;
+
+};
+
+
+// ======================================================
+// CALCULATE POPULARITY SCORE
+// ======================================================
+
+const calculatePopularityScore = (
+    item
+) => {
+
+    const importance =
+        Number(
+            item.importance
+        ) || 0;
+
+
+    const itemClass =
+        String(
+            item.class ||
+            ''
+        ).toLowerCase();
+
+
+    const itemType =
+        String(
+            item.type ||
+            ''
+        ).toLowerCase();
+
+
+    let score =
+        importance * 100;
+
+
+    // Strong boost for tourism objects
+    if (
+        itemClass === 'tourism'
+    ) {
+
+        score += 50;
+
+    }
+
+
+    // Strong boost for historic places
+    if (
+        itemClass === 'historic'
+    ) {
+
+        score += 40;
+
+    }
+
+
+    // Attraction types
+    const importantTypes = [
+
+        'attraction',
+        'monument',
+        'museum',
+        'viewpoint',
+        'temple',
+        'shrine',
+        'heritage',
+        'archaeological_site'
+
+    ];
+
+
+    if (
+        importantTypes.includes(itemType)
+    ) {
+
+        score += 30;
+
+    }
+
+
+    // Famous categories
+    if (
+        itemType === 'temple'
+    ) {
+
+        score += 20;
+
+    }
+
+
+    if (
+        itemType === 'monument'
+    ) {
+
+        score += 20;
+
+    }
+
+
+    if (
+        itemType === 'museum'
+    ) {
+
+        score += 15;
+
+    }
+
+
+    return Number(
+        score.toFixed(2)
+    );
+
+};
+
+
+// ======================================================
+// GET LANDMARKS
 // ======================================================
 
 const getLandmarks =
@@ -951,10 +1265,6 @@ const getLandmarks =
         const cacheKey =
             cleanDestination.toLowerCase();
 
-
-        // ==================================================
-        // CACHE
-        // ==================================================
 
         const cached =
             landmarkCache.get(
@@ -981,21 +1291,141 @@ const getLandmarks =
 
         try {
 
-            const categories = [
+            // ==================================================
+            // DESTINATION COORDINATES
+            // ==================================================
 
-                'tourist attraction',
-                'museum',
-                'monument',
-                'viewpoint',
-                'castle',
-                'palace',
-                'church',
+            console.log(
+                `[Landmark Search] Finding coordinates for ${cleanDestination}`
+            );
+
+
+            const locationResponse =
+                await nominatimRequest(
+                    {
+
+                        q:
+                            cleanDestination,
+
+                        format:
+                            'json',
+
+                        addressdetails:
+                            1,
+
+                        namedetails:
+                            1,
+
+                        limit:
+                            1
+
+                    },
+                    15000
+                );
+
+
+            if (
+                !locationResponse.data ||
+                locationResponse.data.length === 0
+            ) {
+
+                console.warn(
+                    `[Landmark Search] Destination not found: ${cleanDestination}`
+                );
+
+
+                return [];
+
+            }
+
+
+            const destinationLocation =
+                locationResponse.data[0];
+
+
+            const centerLat =
+                Number(
+                    destinationLocation.lat
+                );
+
+
+            const centerLon =
+                Number(
+                    destinationLocation.lon
+                );
+
+
+            if (
+                !Number.isFinite(centerLat) ||
+                !Number.isFinite(centerLon)
+            ) {
+
+                return [];
+
+            }
+
+
+            console.log(
+                `[Landmark Search] Destination coordinates: ${centerLat}, ${centerLon}`
+            );
+
+
+            // ==================================================
+            // SEARCH BOX
+            // ==================================================
+
+            const latOffset =
+                0.15;
+
+
+            const lonOffset =
+                0.15;
+
+
+            const south =
+                centerLat -
+                latOffset;
+
+
+            const north =
+                centerLat +
+                latOffset;
+
+
+            const west =
+                centerLon -
+                lonOffset;
+
+
+            const east =
+                centerLon +
+                lonOffset;
+
+
+            const viewbox =
+                `${west},${north},${east},${south}`;
+
+
+            // ==================================================
+            // SEARCH CATEGORIES
+            // ==================================================
+
+            const queries = [
+
+                'tourism',
+                'attraction',
                 'temple',
-                'cathedral',
-                'historic site',
-                'national park',
-                'beach',
-                'landmark'
+                'historic',
+                'monument',
+                'museum',
+                'viewpoint',
+                'shrine',
+                'heritage',
+                'park',
+                'garden',
+                'waterfall',
+                'memorial',
+                'archaeological site'
 
             ];
 
@@ -1004,12 +1434,102 @@ const getLandmarks =
 
 
             // ==================================================
-            // CATEGORY SEARCH
+            // SEARCH
             // ==================================================
 
             for (
-                const category
-                of categories
+                const query of queries
+            ) {
+
+                try {
+
+                    console.log(
+                        `[Landmark Search] Searching: ${query}`
+                    );
+
+
+                    const response =
+                        await nominatimRequest(
+                            {
+
+                                q:
+                                    query,
+
+                                format:
+                                    'json',
+
+                                viewbox:
+                                    viewbox,
+
+                                bounded:
+                                    1,
+
+                                limit:
+                                    20,
+
+                                addressdetails:
+                                    1,
+
+                                namedetails:
+                                    1
+
+                            },
+                            20000
+                        );
+
+
+                    const results =
+                        response.data ||
+                        [];
+
+
+                    console.log(
+                        `[Landmark Search] ${query}: ${results.length} results`
+                    );
+
+
+                    allLandmarks.push(
+                        ...results
+                    );
+
+
+                } catch (error) {
+
+                    console.warn(
+                        `[Landmark Search] ${query} failed:`,
+                        error.message
+                    );
+
+                }
+
+
+                if (
+                    allLandmarks.length >= 150
+                ) {
+
+                    break;
+
+                }
+
+            }
+
+
+            // ==================================================
+            // DIRECT DESTINATION SEARCHES
+            // ==================================================
+
+            const directQueries = [
+
+                `${cleanDestination} temple`,
+                `${cleanDestination} tourist attraction`,
+                `${cleanDestination} famous places`,
+                `${cleanDestination} tourist places`
+
+            ];
+
+
+            for (
+                const query of directQueries
             ) {
 
                 try {
@@ -1019,15 +1539,18 @@ const getLandmarks =
                             {
 
                                 q:
-                                    `${category} in ${cleanDestination}`,
+                                    query,
 
                                 format:
                                     'json',
 
                                 limit:
-                                    10,
+                                    15,
 
                                 addressdetails:
+                                    1,
+
+                                namedetails:
                                     1
 
                             },
@@ -1043,64 +1566,7 @@ const getLandmarks =
                 } catch (error) {
 
                     console.warn(
-                        `Landmark category failed: ${category}`,
-                        error.message
-                    );
-
-                }
-
-
-                if (
-                    allLandmarks.length >= 30
-                ) {
-
-                    break;
-
-                }
-
-            }
-
-
-            // ==================================================
-            // BROADER SEARCH
-            // ==================================================
-
-            if (
-                allLandmarks.length < 15
-            ) {
-
-                try {
-
-                    const broaderResponse =
-                        await nominatimRequest(
-                            {
-
-                                q:
-                                    `tourism in ${cleanDestination}`,
-
-                                format:
-                                    'json',
-
-                                limit:
-                                    30,
-
-                                addressdetails:
-                                    1
-
-                            },
-                            20000
-                        );
-
-
-                    allLandmarks.push(
-                        ...(broaderResponse.data || [])
-                    );
-
-
-                } catch (error) {
-
-                    console.warn(
-                        'Broader landmark search failed:',
+                        `[Landmark Search] Direct search failed: ${query}`,
                         error.message
                     );
 
@@ -1108,60 +1574,33 @@ const getLandmarks =
 
             }
 
+
+            // ==================================================
+            // NO RESULTS
+            // ==================================================
 
             if (
                 allLandmarks.length === 0
             ) {
+
+                console.warn(
+                    `[Landmark Search] No landmarks found for ${cleanDestination}`
+                );
+
 
                 return [];
 
             }
 
 
+            console.log(
+                `[Landmark Search] Total raw results: ${allLandmarks.length}`
+            );
+
+
             // ==================================================
-            // BLACKLIST
+            // DEDUPLICATION
             // ==================================================
-
-            const blacklist = [
-
-                'road',
-                'highway',
-                'street',
-                'station',
-                'stop',
-                'bus',
-                'train',
-                'metro',
-                'airport',
-                'school',
-                'university',
-                'office',
-                'company',
-                'shop',
-                'mall',
-                'bank',
-                'fuel',
-                'residential',
-                'apartment',
-                'hospital',
-                'atm',
-                'parking',
-                'garage',
-                'hotel',
-                'motel',
-                'hostel',
-                'resort',
-                'lodge',
-                'villas',
-                'guest house',
-                'bed & breakfast',
-                'restaurant',
-                'cafe',
-                'bar',
-                'pharmacy'
-
-            ];
-
 
             const seen =
                 new Set();
@@ -1170,54 +1609,42 @@ const getLandmarks =
             const landmarks =
                 allLandmarks
 
-                    .sort(
-                        (a, b) =>
-                            (
-                                b.importance ||
-                                0
-                            ) -
-                            (
-                                a.importance ||
-                                0
-                            )
-                    )
-
                     .filter(
                         item => {
 
-                            const fullName =
-                                (
-                                    item.display_name ||
-                                    ''
-                                ).toLowerCase();
-
-
-                            const firstName =
-                                (
-                                    item.display_name ||
-                                    ''
+                            if (
+                                !isValidLandmark(
+                                    item
                                 )
-                                    .split(',')[0]
-                                    .trim();
+                            ) {
+
+                                return false;
+
+                            }
 
 
-                            const itemClass =
-                                (
-                                    item.class ||
+                            const name =
+                                String(
+                                    item.name ||
+                                    item.namedetails?.name ||
+                                    item.display_name
+                                        ?.split(',')[0] ||
                                     ''
-                                ).toLowerCase();
+                                ).trim();
 
 
-                            const itemType =
-                                (
-                                    item.type ||
-                                    ''
-                                ).toLowerCase();
+                            const normalizedName =
+                                name
+                                    .toLowerCase()
+                                    .replace(
+                                        /\s+/g,
+                                        ' '
+                                    );
 
 
                             if (
                                 seen.has(
-                                    firstName
+                                    normalizedName
                                 )
                             ) {
 
@@ -1226,94 +1653,143 @@ const getLandmarks =
                             }
 
 
-                            if (
-                                firstName.length < 3
-                            ) {
-
-                                return false;
-
-                            }
+                            seen.add(
+                                normalizedName
+                            );
 
 
-                            const isBlacklisted =
-                                blacklist.some(
-                                    word =>
-                                        fullName.includes(word) ||
-                                        itemClass.includes(word) ||
-                                        itemType.includes(word)
-                                );
-
-
-                            const isTouristClass =
-                                [
-
-                                    'tourism',
-                                    'historic',
-                                    'heritage',
-                                    'amenity',
-                                    'leisure',
-                                    'natural'
-
-                                ].includes(
-                                    itemClass
-                                );
-
-
-                            if (
-                                !isBlacklisted &&
-                                (
-                                    item.importance > 0.4 ||
-                                    isTouristClass
-                                )
-                            ) {
-
-                                seen.add(
-                                    firstName
-                                );
-
-                                return true;
-
-                            }
-
-
-                            return false;
+                            return true;
 
                         }
+                    )
+
+                    // ==================================================
+                    // MAP TO APPLICATION FORMAT
+                    // ==================================================
+
+                    .map(
+                        item => {
+
+                            const name =
+                                String(
+                                    item.name ||
+                                    item.namedetails?.name ||
+                                    item.display_name
+                                        ?.split(',')[0] ||
+                                    ''
+                                ).trim();
+
+
+                            const latitude =
+                                Number(
+                                    item.lat
+                                );
+
+
+                            const longitude =
+                                Number(
+                                    item.lon
+                                );
+
+
+                            const popularityScore =
+                                calculatePopularityScore(
+                                    item
+                                );
+
+
+                            return {
+
+                                name,
+
+                                address:
+                                    item.display_name ||
+                                    '',
+
+                                type:
+                                    item.type ||
+                                    'attraction',
+
+                                class:
+                                    item.class ||
+                                    '',
+
+                                importance:
+                                    Number(
+                                        item.importance
+                                    ) ||
+                                    0,
+
+                                popularityScore,
+
+                                lat:
+                                    latitude,
+
+                                lon:
+                                    longitude,
+
+                                latitude,
+
+                                longitude
+
+                            };
+
+                        }
+                    )
+
+                    // ==================================================
+                    // POPULARITY FIRST
+                    // ==================================================
+
+                    .sort(
+                        (a, b) =>
+                            b.popularityScore -
+                            a.popularityScore
                     )
 
                     .slice(
                         0,
                         30
-                    )
-
-                    .map(
-                        item => ({
-
-                            name:
-                                item.display_name
-                                    .split(',')[0]
-                                    .trim(),
-
-                            address:
-                                item.display_name,
-
-                            type:
-                                item.type,
-
-                            class:
-                                item.class,
-
-                            importance:
-                                item.importance,
-
-                            lat:
-                                item.lat,
-
-                            lon:
-                                item.lon
-
-                        })
                     );
+
+
+            // ==================================================
+            // FINAL SAFETY
+            // ==================================================
+
+            const finalLandmarks =
+                landmarks.filter(
+                    place =>
+                        place.name &&
+                        !isInvalidLandmarkName(
+                            place.name
+                        ) &&
+                        Number.isFinite(
+                            place.latitude
+                        ) &&
+                        Number.isFinite(
+                            place.longitude
+                        )
+                );
+
+
+            console.log(
+                `\n[Landmark Search] Valid landmarks for ${cleanDestination}: ${finalLandmarks.length}`
+            );
+
+
+            finalLandmarks.forEach(
+                (
+                    place,
+                    index
+                ) => {
+
+                    console.log(
+                        `  ${index + 1}. ${place.name} | popularity=${place.popularityScore} | ${place.type}`
+                    );
+
+                }
+            );
 
 
             // ==================================================
@@ -1328,13 +1804,13 @@ const getLandmarks =
                         Date.now(),
 
                     data:
-                        landmarks
+                        finalLandmarks
 
                 }
             );
 
 
-            return landmarks;
+            return finalLandmarks;
 
 
         } catch (error) {
