@@ -48,10 +48,7 @@ const generateItinerary = async ({
     // ==================================================
 
     const geo =
-        await resolveDestination(
-            destination
-        );
-
+        await resolveDestination(destination);
 
     if (!geo) {
 
@@ -61,11 +58,9 @@ const generateItinerary = async ({
 
     }
 
-
     console.log(
         `[Itinerary Service] Destination resolved: ${geo.name}, ${geo.country}`
     );
-
 
     console.log(
         `[Itinerary Service] Coordinates: ${geo.latitude}, ${geo.longitude}`
@@ -127,7 +122,6 @@ const generateItinerary = async ({
         `[Itinerary Service] Primary places: ${primaryPlaces.length}`
     );
 
-
     console.log(
         `[Itinerary Service] Nearby places: ${nearbyPlaces.length}`
     );
@@ -152,10 +146,10 @@ const generateItinerary = async ({
 
 
     /*
-        Primary places are intentionally placed FIRST.
+        Primary destination attractions are placed first.
 
-        This makes the main destination attractions
-        more important than distant side trips.
+        Nearby/side-trip locations are kept separate so
+        Gemini knows that they are secondary.
     */
 
     const filteredPlaces = [
@@ -271,7 +265,7 @@ const generateItinerary = async ({
     // ==================================================
 
     console.log(
-        `[Itinerary Service] Sending places to Gemini...`
+        `[Itinerary Service] Sending places and weather to Gemini...`
     );
 
 
@@ -302,18 +296,23 @@ const generateItinerary = async ({
             pace:
                 pace,
 
+            // Weather sent to AI
             weatherForecast:
                 weather,
 
+            // Main destination attractions
             primaryPlaces:
                 filteredPrimaryPlaces,
 
+            // Nearby / side-trip attractions
             nearbyPlaces:
                 filteredNearbyPlaces,
 
+            // All available places
             candidatePlaces:
                 filteredPlaces,
 
+            // Distance information
             distanceMatrix:
                 distanceMatrix
 
@@ -361,7 +360,53 @@ const generateItinerary = async ({
 
 
     // ==================================================
-    // 10. ADD ROUTE INFORMATION
+    // 10. ATTACH WEATHER TO EACH ITINERARY DAY
+    // ==================================================
+
+    /*
+        Gemini generates the activities.
+
+        Weather comes from our weather service, NOT from
+        Gemini.
+
+        We attach the correct weather record to each
+        itinerary day here.
+
+        This guarantees that the frontend can access:
+
+            day.weather
+
+        without depending on Gemini to generate it.
+    */
+
+    aiItinerary.days =
+        aiItinerary.days.map(
+            (day, index) => {
+
+                const dayWeather =
+                    weather[index] || null;
+
+
+                return {
+
+                    ...day,
+
+                    weather:
+                        dayWeather
+
+                };
+
+            }
+        );
+
+
+    console.log(
+        '[Itinerary Service] Weather attached to each itinerary day.'
+    );
+
+
+    // ==================================================
+    // 11. ADD ROUTE INFORMATION
     // ==================================================
 
     for (
@@ -475,7 +520,7 @@ const generateItinerary = async ({
 
 
     // ==================================================
-    // 11. FIND USED PLACE IDS
+    // 12. FIND USED PLACE IDS
     // ==================================================
 
     const usedPlaceIds =
@@ -508,7 +553,7 @@ const generateItinerary = async ({
 
 
     // ==================================================
-    // 12. MORE PRIMARY PLACES
+    // 13. MORE PRIMARY PLACES
     // ==================================================
 
     const morePrimaryPlaces =
@@ -521,7 +566,7 @@ const generateItinerary = async ({
 
 
     // ==================================================
-    // 13. MORE NEARBY PLACES
+    // 14. MORE NEARBY PLACES
     // ==================================================
 
     const moreNearbyPlaces =
@@ -534,7 +579,7 @@ const generateItinerary = async ({
 
 
     // ==================================================
-    // 14. FINAL RESPONSE
+    // 15. FINAL RESPONSE
     // ==================================================
 
     return {
@@ -572,6 +617,7 @@ const generateItinerary = async ({
         pace:
             pace,
 
+        // Complete weather forecast
         weather:
             weather,
 
