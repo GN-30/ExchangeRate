@@ -1,6 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY_1 = process.env.GEMINI_API_KEY_1;
 
 const PRIMARY_MODEL =
     process.env.GEMINI_MODEL || 'gemini-3.6-flash';
