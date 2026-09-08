@@ -2093,9 +2093,15 @@ const PlanTrip = () => {
                         grid-template-columns:
                             repeat(
                                 auto-fit,
-                                minmax(220px, 1fr)
+                                minmax(180px, 1fr)
                             );
                         gap: 1rem;
+                    }
+
+                    @media (max-width: 580px) {
+                        .date-grid {
+                            grid-template-columns: 1fr !important;
+                        }
                     }
 
                     .date-selection-card {

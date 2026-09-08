@@ -29,13 +29,19 @@ import Trends from './components/Trends';
 import Alerts from './components/Alerts';
 import Chatbot from './components/Chatbot';
 import ThemeFlightToggle from './components/ThemeFlightToggle';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 
 import {
     Plane,
     Wallet,
     Map,
-    Globe
+    Globe,
+    Compass,
+    TrendingUp,
+    Bell,
+    Home as HomeIcon,
+    User
 } from 'lucide-react';
 
 
@@ -121,24 +127,7 @@ function Home() {
 
         <div className="fade-in">
 
-            <header
-                style={{
-                    position: 'relative',
-                    textAlign: 'center',
-                    marginBottom: '4rem',
-                    padding: '5rem 2rem',
-                    borderRadius: '2rem',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow:
-                        '0 20px 40px rgba(0,0,0,0.5)',
-                    border:
-                        '1px solid var(--glass-border)'
-                }}
-            >
+            <header className="home-hero">
 
                 {/* HERO IMAGE */}
 
@@ -172,22 +161,7 @@ function Home() {
 
                 {/* HERO ICON */}
 
-                <div
-                    style={{
-                        display: 'inline-flex',
-                        padding: '1.5rem',
-                        background:
-                            'rgba(255,255,255,0.15)',
-                        backdropFilter:
-                            'blur(10px)',
-                        border:
-                            '1px solid rgba(255,255,255,0.3)',
-                        borderRadius: '1.5rem',
-                        marginBottom: '2rem',
-                        boxShadow:
-                            '0 8px 32px rgba(0,0,0,0.3)'
-                    }}
-                >
+                <div className="hero-icon-wrap">
 
                     <Plane
                         size={56}
@@ -203,17 +177,7 @@ function Home() {
 
                 {/* TITLE */}
 
-                <h1
-                    style={{
-                        fontSize: '4rem',
-                        fontWeight: '800',
-                        marginBottom: '1rem',
-                        color: '#ffffff',
-                        textShadow:
-                            '0 4px 12px rgba(0,0,0,0.6)',
-                        letterSpacing: '-0.05em'
-                    }}
-                >
+                <h1 className="hero-title">
                     Welcome back,{' '}
                     {user?.name?.split(' ')[0] ||
                         'Explorer'}!
@@ -222,18 +186,7 @@ function Home() {
 
                 {/* DESCRIPTION */}
 
-                <p
-                    style={{
-                        color: '#e2e8f0',
-                        fontSize: '1.4rem',
-                        maxWidth: '700px',
-                        margin: '0 auto',
-                        textShadow:
-                            '0 2px 8px rgba(0,0,0,0.9)',
-                        fontWeight: '400',
-                        lineHeight: '1.6'
-                    }}
-                >
+                <p className="hero-subtitle">
                     Your AI-powered travel assistant.
                     Plan budgets, track expenses,
                     and optimize your currency
@@ -251,17 +204,7 @@ function Home() {
                 HOME CARDS
                ================================================== */}
 
-            <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns:
-                        'repeat(auto-fit, minmax(300px, 1fr))',
-                    gap: '2rem',
-                    marginBottom: '4rem',
-                    maxWidth: '1100px',
-                    margin: '0 auto 4rem auto'
-                }}
-            >
+            <div className="home-cards-grid">
 
                 {/* PLAN */}
 
@@ -531,6 +474,45 @@ function Home() {
 
 
 /* ============================================================
+   MOBILE BOTTOM NAV
+   ============================================================ */
+
+function MobileBottomNav() {
+    const { user } = useContext(AuthContext);
+    const location = useLocation();
+
+    if (!user) return null;
+
+    const navItems = [
+        { path: '/',         label: 'Home',     icon: <HomeIcon size={20} /> },
+        { path: '/plan',     label: 'Plan',     icon: <Compass size={20} /> },
+        { path: '/expenses', label: 'Expenses', icon: <Wallet size={20} /> },
+        { path: '/trends',   label: 'Trends',   icon: <TrendingUp size={20} /> },
+        { path: '/alerts',   label: 'Alerts',   icon: <Bell size={20} /> },
+    ];
+
+    return (
+        <nav className="mobile-bottom-nav">
+            {navItems.map(item => {
+                const active = location.pathname === item.path;
+                return (
+                    <Link
+                        key={item.path}
+                        to={item.path}
+                        className={`mobile-nav-item${active ? ' active' : ''}`}
+                        aria-label={item.label}
+                    >
+                        <span className="mobile-nav-icon">{item.icon}</span>
+                        <span className="mobile-nav-label">{item.label}</span>
+                    </Link>
+                );
+            })}
+        </nav>
+    );
+}
+
+
+/* ============================================================
    APP CONTENT
    ============================================================ */
 
@@ -554,12 +536,16 @@ function AppContent() {
 
             <ThemeFlightToggle />
 
+            {/* PWA Install Popup */}
+            <PWAInstallPrompt />
+
 
             <div
                 className="container"
                 style={{
                     position: 'relative',
-                    zIndex: 1
+                    zIndex: 1,
+                    paddingBottom: '5rem'
                 }}
             >
 
@@ -681,6 +667,11 @@ function AppContent() {
                 </footer>
 
             </div>
+
+            {/* ================================================
+                MOBILE BOTTOM NAVIGATION BAR
+               ================================================ */}
+            <MobileBottomNav />
 
         </>
 

@@ -1314,7 +1314,7 @@ const Chatbot = () => {
     return (
 
         <div
-
+            className={`chatbot-root${isOpen ? ' is-open' : ''}`}
             style={{
                 position:
                     'fixed',
@@ -1381,7 +1381,7 @@ const Chatbot = () => {
                                 25
                         }}
 
-                        className="glass-card"
+                        className="glass-card chatbot-window"
 
                         style={{
                             width:
@@ -1645,130 +1645,60 @@ const Chatbot = () => {
                                 </div>
 
                             </div>
-                            <motion.button
-    type="button"
-    onClick={clearChat}
-    whileHover={{
-        scale: 1.05,
-        y: -1
-    }}
-    whileTap={{
-        scale: 0.94
-    }}
-    title="Clear conversation"
-    aria-label="Clear conversation"
-    style={{
-        minWidth: '72px',
-        height: '34px',
-        border: '1px solid rgba(255,255,255,0.35)',
-        borderRadius: '17px',
-        background: 'rgba(255,255,255,0.14)',
-        color: '#ffffff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '0.3rem',
-        cursor: 'pointer',
-        fontSize: '0.68rem',
-        fontWeight: '800',
-        backdropFilter: 'blur(10px)'
-    }}
->
-    <Trash2
-        size={15}
-        strokeWidth={2.5}
-    />
 
-    
-</motion.button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <motion.button
+                                    type="button"
+                                    onClick={clearChat}
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    title="Clear conversation"
+                                    aria-label="Clear conversation"
+                                    style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        minWidth: '32px',
+                                        borderRadius: '50%',
+                                        border: '1px solid rgba(255,255,255,0.35)',
+                                        background: 'rgba(255,255,255,0.14)',
+                                        color: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        padding: 0,
+                                        backdropFilter: 'blur(10px)'
+                                    }}
+                                >
+                                    <Trash2 size={15} strokeWidth={2.2} />
+                                </motion.button>
 
-
-                            {/* ==================================================
-                                CLOSE BUTTON
-                            ================================================== */}
-
-                            <motion.button
-
-                                type="button"
-
-                                onClick={() =>
-                                    setIsOpen(
-                                        false
-                                    )
-                                }
-
-                                whileHover={{
-                                    scale:
-                                        1.08,
-
-                                    rotate:
-                                        0
-                                }}
-
-                                whileTap={{
-                                    scale:
-                                        0.9
-                                }}
-
-                                aria-label="Close chatbot"
-
-                                title="Close chatbot"
-
-                                style={{
-                                    minWidth:
-                                        '78px',
-
-                                    height:
-                                        '34px',
-
-                                    border:
-                                        '1px solid rgba(255,255,255,0.4)',
-
-                                    borderRadius:
-                                        '17px',
-
-                                    background:
-                                        'rgba(255,255,255,0.16)',
-
-                                    color:
-                                        '#ffffff',
-
-                                    display:
-                                        'flex',
-
-                                    alignItems:
-                                        'center',
-
-                                    justifyContent:
-                                        'center',
-
-                                    gap:
-                                        '0.35rem',
-
-                                    cursor:
-                                        'pointer',
-
-                                    fontSize:
-                                        '0.7rem',
-
-                                    fontWeight:
-                                        '800',
-
-                                    backdropFilter:
-                                        'blur(10px)'
-                                }}
-
-                            >
-
-                                <X
-                                    size={17}
-                                    strokeWidth={3}
-                                />
-
-                                
-
-                            </motion.button>
-
+                                <motion.button
+                                    type="button"
+                                    onClick={() => setIsOpen(false)}
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    aria-label="Close chatbot"
+                                    title="Close chatbot"
+                                    style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        minWidth: '32px',
+                                        borderRadius: '50%',
+                                        border: '1px solid rgba(255,255,255,0.4)',
+                                        background: 'rgba(255,255,255,0.16)',
+                                        color: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        padding: 0,
+                                        backdropFilter: 'blur(10px)'
+                                    }}
+                                >
+                                    <X size={16} strokeWidth={2.8} />
+                                </motion.button>
+                            </div>
                         </div>
 
 
@@ -1780,13 +1710,13 @@ const Chatbot = () => {
 
                             style={{
                                 padding:
-                                    '0.65rem 0.8rem',
+                                    '0.5rem 0.6rem',
 
                                 display:
                                     'flex',
 
                                 gap:
-                                    '0.5rem',
+                                    '0.35rem',
 
                                 borderBottom:
                                     '1px solid var(--glass-border)',
@@ -1798,7 +1728,13 @@ const Chatbot = () => {
                                     'relative',
 
                                 zIndex:
-                                    50
+                                    50,
+
+                                width:
+                                    '100%',
+
+                                boxSizing:
+                                    'border-box'
                             }}
 
                         >
@@ -1816,7 +1752,10 @@ const Chatbot = () => {
                                         'relative',
 
                                     flex:
-                                        1
+                                        1,
+
+                                    minWidth:
+                                        0
                                 }}
 
                             >
@@ -1868,58 +1807,54 @@ const Chatbot = () => {
                                             'center',
 
                                         gap:
-                                            '0.4rem',
+                                            '0.3rem',
 
                                         padding:
-                                            '0 0.75rem',
+                                            '0 0.5rem',
 
                                         cursor:
-                                            'pointer'
+                                            'pointer',
+
+                                        minWidth:
+                                            0,
+
+                                        boxSizing:
+                                            'border-box'
                                     }}
 
                                 >
 
                                     <Globe
-                                        size={15}
+                                        size={14}
                                     />
 
                                     <span
 
                                         style={{
                                             fontSize:
-                                                '0.72rem',
+                                                '0.68rem',
 
                                             fontWeight:
-                                                '800'
-                                        }}
+                                                '800',
 
-                                    >
-                                        Language
-                                    </span>
+                                            overflow:
+                                                'hidden',
 
+                                            textOverflow:
+                                                'ellipsis',
 
-                                    <span
+                                            whiteSpace:
+                                                'nowrap',
 
-                                        style={{
                                             flex:
                                                 1,
 
                                             textAlign:
-                                                'right',
-
-                                            fontSize:
-                                                '0.68rem',
-
-                                            opacity:
-                                                0.7
+                                                'left'
                                         }}
 
                                     >
-
-                                        {
-                                            selectedLanguage?.native
-                                        }
-
+                                        {selectedLanguage?.name || 'English'}
                                     </span>
 
 
@@ -1932,10 +1867,18 @@ const Chatbot = () => {
                                                     : 0
                                         }}
 
+                                        style={{
+                                            display:
+                                                'flex',
+
+                                            flexShrink:
+                                                0
+                                        }}
+
                                     >
 
                                         <ChevronDown
-                                            size={15}
+                                            size={14}
                                         />
 
                                     </motion.div>
@@ -2313,7 +2256,7 @@ const Chatbot = () => {
                                         '2.45rem',
 
                                     padding:
-                                        '0 0.8rem',
+                                        '0 0.5rem',
 
                                     borderRadius:
                                         '1.3rem',
@@ -2341,16 +2284,22 @@ const Chatbot = () => {
                                         'center',
 
                                     gap:
-                                        '0.35rem',
+                                        '0.25rem',
 
                                     cursor:
                                         'pointer',
 
                                     fontSize:
-                                        '0.7rem',
+                                        '0.68rem',
 
                                     fontWeight:
-                                        '800'
+                                        '800',
+
+                                    flexShrink:
+                                        0,
+
+                                    boxSizing:
+                                        'border-box'
                                 }}
 
                             >
@@ -3267,10 +3216,10 @@ const Chatbot = () => {
                                         'center',
 
                                     gap:
-                                        '0.5rem',
+                                        '0.4rem',
 
                                     padding:
-                                        '0.35rem',
+                                        '0.3rem',
 
                                     borderRadius:
                                         '1.8rem',
@@ -3282,7 +3231,13 @@ const Chatbot = () => {
                                         '1px solid var(--glass-border)',
 
                                     boxShadow:
-                                        '0 5px 20px rgba(0,0,0,0.08)'
+                                        '0 5px 20px rgba(0,0,0,0.08)',
+
+                                    width:
+                                        '100%',
+
+                                    boxSizing:
+                                        'border-box'
                                 }}
 
                             >
@@ -3323,13 +3278,13 @@ const Chatbot = () => {
                                             1,
 
                                         height:
-                                            '2.6rem',
+                                            '2.45rem',
 
                                         minWidth:
                                             0,
 
                                         padding:
-                                            '0 0.85rem',
+                                            '0 0.75rem',
 
                                         background:
                                             'transparent',
@@ -3379,8 +3334,11 @@ const Chatbot = () => {
                                         aria-label="Stop generating"
 
                                         style={{
+                                            width:
+                                                '40px',
+
                                             minWidth:
-                                                '82px',
+                                                '40px',
 
                                             height:
                                                 '2.45rem',
@@ -3406,17 +3364,14 @@ const Chatbot = () => {
                                             justifyContent:
                                                 'center',
 
-                                            gap:
-                                                '0.35rem',
-
                                             cursor:
                                                 'pointer',
 
-                                            fontSize:
-                                                '0.7rem',
+                                            padding:
+                                                0,
 
-                                            fontWeight:
-                                                '800',
+                                            flexShrink:
+                                                0,
 
                                             boxShadow:
                                                 '0 5px 18px rgba(99,102,241,0.35)'
@@ -3431,8 +3386,6 @@ const Chatbot = () => {
                                             fill="currentColor"
 
                                         />
-
-                                        
 
                                     </motion.button>
 
@@ -3472,8 +3425,11 @@ const Chatbot = () => {
                                         aria-label="Send message"
 
                                         style={{
+                                            width:
+                                                '40px',
+
                                             minWidth:
-                                                '82px',
+                                                '40px',
 
                                             height:
                                                 '2.45rem',
@@ -3499,19 +3455,13 @@ const Chatbot = () => {
                                             justifyContent:
                                                 'center',
 
-                                            gap:
-                                                '0.4rem',
-
                                             cursor:
                                                 input.trim()
                                                     ? 'pointer'
                                                     : 'not-allowed',
 
-                                            fontSize:
-                                                '0.7rem',
-
-                                            fontWeight:
-                                                '800',
+                                            padding:
+                                                0,
 
                                             opacity:
                                                 input.trim()
@@ -3536,8 +3486,6 @@ const Chatbot = () => {
                                             strokeWidth={2.8}
 
                                         />
-
-                                        
 
                                     </motion.button>
 
@@ -3590,6 +3538,7 @@ const Chatbot = () => {
                 <motion.button
 
                     type="button"
+                    className="chatbot-trigger-btn"
 
                     onClick={() =>
                         setIsOpen(
@@ -3704,6 +3653,8 @@ const Chatbot = () => {
 
                         <Bot
 
+                            className="chatbot-bot-icon"
+
                             size={38}
 
                             strokeWidth={2.5}
@@ -3714,6 +3665,8 @@ const Chatbot = () => {
 
 
                     <motion.div
+
+                        className="chatbot-sparkles-wrap"
 
                         animate={{
                             scale:
