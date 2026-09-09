@@ -139,10 +139,8 @@ app.get(
             );
 
             res.status(500).json({
-
                 error:
                     'Failed to search locations'
-
             });
 
         }
@@ -179,7 +177,6 @@ app.get(
                 '[History] Fetching trips for user:',
                 req.user.id
             );
-
 
             const {
                 data: trips,
@@ -287,10 +284,8 @@ app.post(
             );
 
             res.status(400).json({
-
                 error:
                     err.message
-
             });
 
         }
@@ -332,10 +327,8 @@ app.post(
             );
 
             res.status(400).json({
-
                 error:
                     err.message
-
             });
 
         }
@@ -359,7 +352,6 @@ app.get(
                 '[Auth/Me] Fetching user:',
                 req.user.id
             );
-
 
             const {
                 data: user,
@@ -399,10 +391,8 @@ app.get(
             if (!user) {
 
                 return res.status(404).json({
-
                     error:
                         'User not found'
-
                 });
 
             }
@@ -477,12 +467,9 @@ app.post(
 
                     const decoded =
                         jwt.verify(
-
                             token,
-
                             process.env.JWT_SECRET ||
                             'secret_key'
-
                         );
 
                     userId =
@@ -542,14 +529,12 @@ app.post(
                 Array.isArray(history)
 
                     ? history
-
                         .filter(
                             item =>
                                 item &&
                                 typeof item.text ===
                                 'string'
                         )
-
                         .slice(-20)
 
                     : [];
@@ -781,11 +766,6 @@ app.post(
                     }
                 );
 
-                /*
-                 * Give Node a moment to flush the final
-                 * SSE event before closing the response.
-                 */
-
                 setImmediate(
                     () => {
 
@@ -844,9 +824,7 @@ app.post(
                 try {
 
                     res.write(
-
                         `event: error\n` +
-
                         `data: ${JSON.stringify({
 
                             success:
@@ -857,7 +835,6 @@ app.post(
                                 'Failed to generate response.'
 
                         })}\n\n`
-
                     );
 
                 } catch (writeError) {
@@ -990,10 +967,8 @@ app.get(
             if (!trip) {
 
                 return res.status(404).json({
-
                     error:
                         'Trip not found'
-
                 });
 
             }
@@ -1028,10 +1003,6 @@ app.get(
 
 // ======================================================
 // EXPENSES GET
-// ======================================================
-
-// ======================================================
-// EXPENSES GET - SUPABASE
 // ======================================================
 
 app.get(
@@ -1142,10 +1113,6 @@ app.get(
 // EXPENSE CREATE
 // ======================================================
 
-// ======================================================
-// EXPENSE CREATE - SUPABASE
-// ======================================================
-
 app.post(
     '/api/expenses',
     authMiddleware,
@@ -1172,10 +1139,8 @@ app.post(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'trip_id is required'
-
                 });
 
             }
@@ -1186,10 +1151,8 @@ app.post(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'category is required'
-
                 });
 
             }
@@ -1202,10 +1165,8 @@ app.post(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'Valid amount_inr is required'
-
                 });
 
             }
@@ -1218,10 +1179,8 @@ app.post(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'Valid amount_local is required'
-
                 });
 
             }
@@ -1232,10 +1191,8 @@ app.post(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'date is required'
-
                 });
 
             }
@@ -1361,7 +1318,6 @@ app.post(
                 '[Expenses] Expense saved successfully.'
             );
 
-
             console.log(
                 '[Expenses] Expense ID:',
                 expense.id
@@ -1371,7 +1327,6 @@ app.post(
             return res.status(201).json(
                 expense
             );
-
 
         } catch (error) {
 
@@ -1400,10 +1355,6 @@ app.post(
 // EXPENSE DELETE
 // ======================================================
 
-// ======================================================
-// EXPENSE DELETE - SUPABASE
-// ======================================================
-
 app.delete(
     '/api/expenses/:id',
     authMiddleware,
@@ -1421,10 +1372,8 @@ app.delete(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'Invalid expense ID'
-
                 });
 
             }
@@ -1479,10 +1428,8 @@ app.delete(
             if (!deletedExpense) {
 
                 return res.status(404).json({
-
                     error:
                         'Expense not found'
-
                 });
 
             }
@@ -1526,12 +1473,9 @@ app.delete(
     }
 );
 
-// ======================================================
-// ALERT CREATE
-// ======================================================
 
 // ======================================================
-// CREATE ALERT - SUPABASE
+// ALERT CREATE
 // ======================================================
 
 app.post(
@@ -1558,10 +1502,8 @@ app.post(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'currency_code is required'
-
                 });
 
             }
@@ -1574,10 +1516,8 @@ app.post(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'Valid target_rate is required'
-
                 });
 
             }
@@ -1589,10 +1529,8 @@ app.post(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         "condition must be either 'above' or 'below'"
-
                 });
 
             }
@@ -1679,7 +1617,6 @@ app.post(
                 alert
             );
 
-
         } catch (err) {
 
             console.error(
@@ -1694,6 +1631,216 @@ app.post(
 
                 details:
                     err.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ======================================================
+// ALERT GET - ACTIVE + SENT
+// ======================================================
+
+app.get(
+    '/api/alerts',
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            console.log(
+                '[Alerts] Fetching alerts for user:',
+                req.user.id
+            );
+
+
+            const {
+                data: alerts,
+                error
+            } = await supabase
+                .from('alerts')
+                .select('*')
+                .eq(
+                    'user_id',
+                    Number(req.user.id)
+                )
+                .order(
+                    'created_at',
+                    {
+                        ascending: false
+                    }
+                );
+
+
+            if (error) {
+
+                console.error(
+                    '[Alerts] Supabase fetch error:',
+                    error
+                );
+
+                return res.status(500).json({
+
+                    error:
+                        'Failed to fetch alerts',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            console.log(
+                `[Alerts] Found ${alerts?.length || 0} alerts`
+            );
+
+
+            return res.json(
+                alerts || []
+            );
+
+        } catch (error) {
+
+            console.error(
+                '[Alerts] Fetch error:',
+                error
+            );
+
+            return res.status(500).json({
+
+                error:
+                    'Failed to fetch alerts',
+
+                details:
+                    error.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ======================================================
+// ALERT DELETE
+// ======================================================
+
+app.delete(
+    '/api/alerts/:id',
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            const alertId =
+                Number(req.params.id);
+
+
+            if (
+                !alertId ||
+                Number.isNaN(alertId)
+            ) {
+
+                return res.status(400).json({
+                    error:
+                        'Invalid alert ID'
+                });
+
+            }
+
+
+            console.log(
+                '[Alerts] Deleting alert:',
+                alertId,
+                'User:',
+                req.user.id
+            );
+
+
+            const {
+                data: deletedAlert,
+                error
+            } = await supabase
+                .from('alerts')
+                .delete()
+                .eq(
+                    'id',
+                    alertId
+                )
+                .eq(
+                    'user_id',
+                    Number(req.user.id)
+                )
+                .select('*')
+                .maybeSingle();
+
+
+            if (error) {
+
+                console.error(
+                    '[Alerts] Supabase delete error:',
+                    error
+                );
+
+                return res.status(500).json({
+
+                    error:
+                        'Failed to delete alert',
+
+                    details:
+                        error.message
+
+                });
+
+            }
+
+
+            if (!deletedAlert) {
+
+                return res.status(404).json({
+                    error:
+                        'Alert not found'
+                });
+
+            }
+
+
+            console.log(
+                '[Alerts] Alert deleted successfully:',
+                deletedAlert.id
+            );
+
+
+            return res.json({
+
+                success:
+                    true,
+
+                alert:
+                    deletedAlert
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                '[Alerts] Delete error:',
+                error
+            );
+
+            return res.status(500).json({
+
+                error:
+                    'Failed to delete alert',
+
+                details:
+                    error.message
 
             });
 
@@ -1796,10 +1943,8 @@ app.get(
             ) {
 
                 return res.status(400).json({
-
                     error:
                         'Currency or country is required'
-
                 });
 
             }
@@ -1883,7 +2028,6 @@ app.get(
                                     {
                                         month:
                                             'short',
-
                                         day:
                                             'numeric'
                                     }
@@ -1990,10 +2134,8 @@ app.get(
                 ) {
 
                     return res.status(
-
                         apiError.response.status ||
                         502
-
                     ).json({
 
                         error:
@@ -2030,14 +2172,12 @@ app.get(
 
             const data =
                 rows
-
                     .filter(
                         row =>
                             row &&
                             typeof row.rate ===
                             'number'
                     )
-
                     .map(
                         row => {
 
@@ -2055,7 +2195,6 @@ app.get(
                                         {
                                             month:
                                                 'short',
-
                                             day:
                                                 'numeric'
                                         }
@@ -2228,6 +2367,7 @@ app.listen(
         console.log(
             '========================================'
         );
+
 
         startAlertWorker();
 
