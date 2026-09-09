@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
@@ -10,43 +11,213 @@ import {
     Target,
     ChevronDown,
     Sparkles,
-    CheckCircle,
-    Loader2
+    CheckCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import API_BASE from '../api';
 
 const Alerts = () => {
-
-    // ======================================================
-    // STATE
-    // ======================================================
-
     const [alerts, setAlerts] = useState([]);
 
-    const [currencies, setCurrencies] = useState([]);
-
-    const [currencyLoading, setCurrencyLoading] = useState(true);
-
     const [formData, setFormData] = useState({
-        currency_code: '',
+        currency_code: 'USD',
         target_rate: '',
         condition: 'below'
     });
 
+    // Currency list
+    const [currencies, setCurrencies] = useState([]);
+    const [loadingCurrencies, setLoadingCurrencies] = useState(true);
 
-    // ======================================================
-    // FETCH ALERTS
-    // ======================================================
+    // ---------------------------------------------------------
+    // Currency names
+    // ---------------------------------------------------------
+    const currencyNames = {
+        USD: 'US Dollar',
+        EUR: 'Euro',
+        GBP: 'British Pound',
+        JPY: 'Japanese Yen',
+        AUD: 'Australian Dollar',
+        CAD: 'Canadian Dollar',
+        CHF: 'Swiss Franc',
+        CNY: 'Chinese Yuan',
+        HKD: 'Hong Kong Dollar',
+        NZD: 'New Zealand Dollar',
+        SGD: 'Singapore Dollar',
+        KRW: 'South Korean Won',
+        THB: 'Thai Baht',
+        MYR: 'Malaysian Ringgit',
+        IDR: 'Indonesian Rupiah',
+        PHP: 'Philippine Peso',
+        VND: 'Vietnamese Dong',
+        AED: 'UAE Dirham',
+        SAR: 'Saudi Riyal',
+        QAR: 'Qatari Riyal',
+        KWD: 'Kuwaiti Dinar',
+        OMR: 'Omani Rial',
+        BHD: 'Bahraini Dinar',
+        ZAR: 'South African Rand',
+        RUB: 'Russian Ruble',
+        BRL: 'Brazilian Real',
+        MXN: 'Mexican Peso',
+        ARS: 'Argentine Peso',
+        CLP: 'Chilean Peso',
+        COP: 'Colombian Peso',
+        TRY: 'Turkish Lira',
+        PLN: 'Polish Zloty',
+        SEK: 'Swedish Krona',
+        NOK: 'Norwegian Krone',
+        DKK: 'Danish Krone',
+        CZK: 'Czech Koruna',
+        HUF: 'Hungarian Forint',
+        ILS: 'Israeli New Shekel',
+        EGP: 'Egyptian Pound',
+        NGN: 'Nigerian Naira',
+        KES: 'Kenyan Shilling',
+        PKR: 'Pakistani Rupee',
+        BDT: 'Bangladeshi Taka',
+        LKR: 'Sri Lankan Rupee',
+        NPR: 'Nepalese Rupee'
+    };
 
-    const fetchAlerts = async () => {
-
+    // ---------------------------------------------------------
+    // Fetch currencies dynamically
+    // ---------------------------------------------------------
+    const fetchCurrencies = async () => {
         try {
+            setLoadingCurrencies(true);
 
+            const response = await axios.get(
+                'https://open.er-api.com/v6/latest/INR'
+            );
+
+            const rates = response.data?.rates || {};
+
+            const currencyList = Object.keys(rates)
+                .sort()
+                .map(code => ({
+                    code,
+                    name: currencyNames[code] || code
+                }));
+
+            setCurrencies(currencyList);
+
+            // Keep USD as default if available
+            if (currencyList.length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    currency_code:
+                        currencyList.some(c => c.code === prev.currency_code)
+                            ? prev.currency_code
+                            : 'USD'
+                }));
+            }
+        } catch (error) {
+            console.error('Error fetching currencies:', error);
+
+            // Fallback currencies
+            setCurrencies([
+                { code: 'USD', name: 'US Dollar' },
+                { code: 'EUR', name: 'Euro' },
+                { code: 'GBP', name: 'British Pound' },
+                { code: 'JPY', name: 'Japanese Yen' },
+                { code: 'AUD', name: 'Australian Dollar' }
+            ]);
+        } finally {
+            setLoadingCurrencies(false);
+        }
+    };
+
+    // ---------------------------------------------------------
+    // Normalize backend response
+    // ---------------------------------------------------------
+    const normalizeAlerts = (data) => {
+        if (Array.isArray(data)) {
+            return data;
+        }
+
+        if (Array.isArray(data?.alerts)) {
+            return data.alerts;
+        }
+
+        if (Array.isArray(data?.data)) {
+            return data.data;
+        }
+
+        return [];
+    };
+
+    // ---------------------------------------------------------
+    // Fetch alerts
+    // ---------------------------------------------------------
+    const fetchAlerts = async () => {
+        try {
             const token = sessionStorage.getItem('token');
 
-            const res = await axios.get(
+            const response = await axios.get(`${API_BASE}/alerts`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            const fetchedAlerts = normalizeAlerts(response.data);
+
+            console.log('Fetched alerts:', fetchedAlerts);
+
+            setAlerts(fetchedAlerts);
+        } catch (error) {
+            console.error(
+                'Error fetching alerts:',
+                error.response?.data || error.message
+            );
+        }
+    };
+
+    // ---------------------------------------------------------
+    // Initial load
+    // ---------------------------------------------------------
+    useEffect(() => {
+        fetchCurrencies();
+        fetchAlerts();
+    }, []);
+
+    // ---------------------------------------------------------
+    // Auto refresh
+    //
+    // This is important because the worker changes:
+    // is_active: true -> false
+    //
+    // Once that happens, the alert moves automatically to
+    // Alert Sent.
+    // ---------------------------------------------------------
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchAlerts();
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    // ---------------------------------------------------------
+    // Create alert
+    // ---------------------------------------------------------
+    const handleAdd = async (e) => {
+        e.preventDefault();
+
+        try {
+            const token = sessionStorage.getItem('token');
+
+            const payload = {
+                currency_code: formData.currency_code,
+                target_rate: Number(formData.target_rate),
+                condition: formData.condition
+            };
+
+            console.log('Creating alert:', payload);
+
+            const response = await axios.post(
                 `${API_BASE}/alerts`,
+                payload,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`
@@ -54,453 +225,281 @@ const Alerts = () => {
                 }
             );
 
-            setAlerts(
-                Array.isArray(res.data)
-                    ? res.data
-                    : []
-            );
-
-        } catch (e) {
-
-            console.error(
-                'Error fetching alerts:',
-                e
-            );
-
-        }
-    };
-
-
-    // ======================================================
-    // FETCH AVAILABLE CURRENCIES DYNAMICALLY
-    // ======================================================
-
-    const fetchCurrencies = async () => {
-
-        try {
-
-            setCurrencyLoading(true);
+            console.log('Created alert response:', response.data);
 
             /*
-             * The same exchange-rate API used by your backend
-             * returns all currencies supported by the API.
+             * Some backends return:
              *
-             * INR is the base currency.
+             * response.data
+             *
+             * while others return:
+             *
+             * response.data.alert
+             *
+             * or:
+             *
+             * response.data.data
              */
+            const createdAlert =
+                response.data?.alert ||
+                response.data?.data ||
+                response.data;
 
-            const response = await axios.get(
-                'https://open.er-api.com/v6/latest/INR'
-            );
+            /*
+             * Immediately put the newly-created alert
+             * into the Active Alerts card.
+             */
+            if (
+                createdAlert &&
+                typeof createdAlert === 'object' &&
+                createdAlert.id
+            ) {
+                const activeAlert = {
+                    ...createdAlert,
+                    currency_code:
+                        createdAlert.currency_code || payload.currency_code,
+                    target_rate:
+                        createdAlert.target_rate ?? payload.target_rate,
+                    condition:
+                        createdAlert.condition || payload.condition,
 
-            const rates = response.data?.rates;
+                    // Newly created alerts are active
+                    is_active:
+                        createdAlert.is_active !== undefined
+                            ? createdAlert.is_active
+                            : true
+                };
 
-            if (!rates || typeof rates !== 'object') {
-
-                throw new Error(
-                    'Currency data unavailable'
-                );
-
+                setAlerts(prevAlerts => [
+                    activeAlert,
+                    ...prevAlerts.filter(
+                        alert => alert.id !== activeAlert.id
+                    )
+                ]);
             }
 
-
             /*
-             * Currency names.
+             * Fetch from backend again.
              *
-             * The currency codes themselves are obtained
-             * dynamically from the API.
+             * This ensures the frontend matches the database.
              */
-
-            const currencyNames = {
-                AED: 'UAE Dirham',
-                AFN: 'Afghan Afghani',
-                ALL: 'Albanian Lek',
-                AMD: 'Armenian Dram',
-                ANG: 'Netherlands Antillean Guilder',
-                AOA: 'Angolan Kwanza',
-                ARS: 'Argentine Peso',
-                AUD: 'Australian Dollar',
-                AWG: 'Aruban Florin',
-                AZN: 'Azerbaijani Manat',
-                BAM: 'Bosnia-Herzegovina Convertible Mark',
-                BBD: 'Barbadian Dollar',
-                BDT: 'Bangladeshi Taka',
-                BGN: 'Bulgarian Lev',
-                BHD: 'Bahraini Dinar',
-                BIF: 'Burundian Franc',
-                BMD: 'Bermudian Dollar',
-                BND: 'Brunei Dollar',
-                BOB: 'Bolivian Boliviano',
-                BRL: 'Brazilian Real',
-                BSD: 'Bahamian Dollar',
-                BTN: 'Bhutanese Ngultrum',
-                BWP: 'Botswana Pula',
-                BYN: 'Belarusian Ruble',
-                BZD: 'Belize Dollar',
-                CAD: 'Canadian Dollar',
-                CDF: 'Congolese Franc',
-                CHF: 'Swiss Franc',
-                CLP: 'Chilean Peso',
-                CNY: 'Chinese Yuan',
-                COP: 'Colombian Peso',
-                CRC: 'Costa Rican Colón',
-                CUP: 'Cuban Peso',
-                CVE: 'Cape Verdean Escudo',
-                CZK: 'Czech Koruna',
-                DJF: 'Djiboutian Franc',
-                DKK: 'Danish Krone',
-                DOP: 'Dominican Peso',
-                DZD: 'Algerian Dinar',
-                EGP: 'Egyptian Pound',
-                ERN: 'Eritrean Nakfa',
-                ETB: 'Ethiopian Birr',
-                EUR: 'Euro',
-                FJD: 'Fijian Dollar',
-                FKP: 'Falkland Islands Pound',
-                FOK: 'Faroese Króna',
-                GBP: 'British Pound',
-                GEL: 'Georgian Lari',
-                GGP: 'Guernsey Pound',
-                GHS: 'Ghanaian Cedi',
-                GIP: 'Gibraltar Pound',
-                GMD: 'Gambian Dalasi',
-                GNF: 'Guinean Franc',
-                GTQ: 'Guatemalan Quetzal',
-                GYD: 'Guyanese Dollar',
-                HKD: 'Hong Kong Dollar',
-                HNL: 'Honduran Lempira',
-                HRK: 'Croatian Kuna',
-                HTG: 'Haitian Gourde',
-                HUF: 'Hungarian Forint',
-                IDR: 'Indonesian Rupiah',
-                ILS: 'Israeli New Shekel',
-                IMP: 'Isle of Man Pound',
-                IQD: 'Iraqi Dinar',
-                IRR: 'Iranian Rial',
-                ISK: 'Icelandic Króna',
-                JEP: 'Jersey Pound',
-                JMD: 'Jamaican Dollar',
-                JOD: 'Jordanian Dinar',
-                JPY: 'Japanese Yen',
-                KES: 'Kenyan Shilling',
-                KGS: 'Kyrgyzstani Som',
-                KHR: 'Cambodian Riel',
-                KID: 'Kiribati Dollar',
-                KMF: 'Comorian Franc',
-                KRW: 'South Korean Won',
-                KWD: 'Kuwaiti Dinar',
-                KYD: 'Cayman Islands Dollar',
-                KZT: 'Kazakhstani Tenge',
-                LAK: 'Lao Kip',
-                LBP: 'Lebanese Pound',
-                LKR: 'Sri Lankan Rupee',
-                LRD: 'Liberian Dollar',
-                LSL: 'Lesotho Loti',
-                LYD: 'Libyan Dinar',
-                MAD: 'Moroccan Dirham',
-                MDL: 'Moldovan Leu',
-                MGA: 'Malagasy Ariary',
-                MKD: 'Macedonian Denar',
-                MMK: 'Myanmar Kyat',
-                MNT: 'Mongolian Tögrög',
-                MOP: 'Macanese Pataca',
-                MRU: 'Mauritanian Ouguiya',
-                MUR: 'Mauritian Rupee',
-                MVR: 'Maldivian Rufiyaa',
-                MWK: 'Malawian Kwacha',
-                MXN: 'Mexican Peso',
-                MYR: 'Malaysian Ringgit',
-                MZN: 'Mozambican Metical',
-                NAD: 'Namibian Dollar',
-                NGN: 'Nigerian Naira',
-                NIO: 'Nicaraguan Córdoba',
-                NOK: 'Norwegian Krone',
-                NPR: 'Nepalese Rupee',
-                NZD: 'New Zealand Dollar',
-                OMR: 'Omani Rial',
-                PAB: 'Panamanian Balboa',
-                PEN: 'Peruvian Sol',
-                PGK: 'Papua New Guinean Kina',
-                PHP: 'Philippine Peso',
-                PKR: 'Pakistani Rupee',
-                PLN: 'Polish Złoty',
-                PYG: 'Paraguayan Guarani',
-                QAR: 'Qatari Riyal',
-                RON: 'Romanian Leu',
-                RSD: 'Serbian Dinar',
-                RUB: 'Russian Ruble',
-                RWF: 'Rwandan Franc',
-                SAR: 'Saudi Riyal',
-                SBD: 'Solomon Islands Dollar',
-                SCR: 'Seychellois Rupee',
-                SDG: 'Sudanese Pound',
-                SEK: 'Swedish Krona',
-                SGD: 'Singapore Dollar',
-                SHP: 'Saint Helena Pound',
-                SLE: 'Sierra Leonean Leone',
-                SLL: 'Sierra Leonean Leone',
-                SOS: 'Somali Shilling',
-                SRD: 'Surinamese Dollar',
-                SSP: 'South Sudanese Pound',
-                STN: 'São Tomé and Príncipe Dobra',
-                SYP: 'Syrian Pound',
-                SZL: 'Eswatini Lilangeni',
-                THB: 'Thai Baht',
-                TJS: 'Tajikistani Somoni',
-                TMT: 'Turkmenistani Manat',
-                TND: 'Tunisian Dinar',
-                TOP: 'Tongan Paʻanga',
-                TRY: 'Turkish Lira',
-                TTD: 'Trinidad and Tobago Dollar',
-                TVD: 'Tuvaluan Dollar',
-                TWD: 'New Taiwan Dollar',
-                TZS: 'Tanzanian Shilling',
-                UAH: 'Ukrainian Hryvnia',
-                UGX: 'Ugandan Shilling',
-                USD: 'US Dollar',
-                UYU: 'Uruguayan Peso',
-                UZS: 'Uzbekistani Som',
-                VES: 'Venezuelan Bolívar',
-                VND: 'Vietnamese Dong',
-                VUV: 'Vanuatu Vatu',
-                WST: 'Samoan Tala',
-                XAF: 'Central African CFA Franc',
-                XCD: 'East Caribbean Dollar',
-                XOF: 'West African CFA Franc',
-                XPF: 'CFP Franc',
-                YER: 'Yemeni Rial',
-                ZAR: 'South African Rand',
-                ZMW: 'Zambian Kwacha',
-                ZWL: 'Zimbabwean Dollar'
-            };
-
-
-            /*
-             * Convert the API rates object into an array.
-             */
-
-            const currencyList = Object.keys(rates)
-                .filter(code => code !== 'INR')
-                .map(code => ({
-                    code,
-                    name:
-                        currencyNames[code] ||
-                        code
-                }))
-                .sort((a, b) =>
-                    a.code.localeCompare(b.code)
-                );
-
-
-            setCurrencies(currencyList);
-
-
-            /*
-             * Set a default currency after loading.
-             */
-
-            setFormData(previous => ({
-                ...previous,
-                currency_code:
-                    previous.currency_code ||
-                    currencyList.find(
-                        currency =>
-                            currency.code === 'USD'
-                    )?.code ||
-                    currencyList[0]?.code ||
-                    ''
-            }));
-
-        } catch (error) {
-
-            console.error(
-                'Failed to load currencies:',
-                error
-            );
-
-            setCurrencies([]);
-
-        } finally {
-
-            setCurrencyLoading(false);
-
-        }
-    };
-
-
-    // ======================================================
-    // INITIAL LOAD + REFRESH
-    // ======================================================
-
-    useEffect(() => {
-
-        fetchAlerts();
-
-        fetchCurrencies();
-
-
-        /*
-         * Refresh alerts every minute.
-         *
-         * The backend worker runs every 5 minutes,
-         * so this allows the UI to detect when
-         * is_active changes from true to false.
-         */
-
-        const interval = setInterval(() => {
-            fetchAlerts();
-        }, 60000);
-
-
-        return () => {
-            clearInterval(interval);
-        };
-
-    }, []);
-
-
-    // ======================================================
-    // CREATE ALERT
-    // ======================================================
-
-    const handleAdd = async (e) => {
-
-        e.preventDefault();
-
-        try {
-
-            const token =
-                sessionStorage.getItem('token');
-
-
-            await axios.post(
-                `${API_BASE}/alerts`,
-                formData,
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    }
-                }
-            );
-
-
-            /*
-             * Refresh immediately after creation.
-             */
-
             await fetchAlerts();
 
-
-            /*
-             * Keep selected currency and condition,
-             * clear only target rate.
-             */
-
-            setFormData(previous => ({
-                ...previous,
+            // Clear target rate
+            setFormData(prev => ({
+                ...prev,
                 target_rate: ''
             }));
 
-        } catch (e) {
-
+        } catch (error) {
             console.error(
                 'Error creating alert:',
-                e
+                error.response?.data || error.message
             );
 
+            alert(
+                error.response?.data?.error ||
+                'Failed to create alert'
+            );
         }
-
     };
 
-
-    // ======================================================
-    // DELETE ALERT
-    // ======================================================
-
+    // ---------------------------------------------------------
+    // Delete alert
+    // ---------------------------------------------------------
     const handleDelete = async (id) => {
-
         try {
+            const token = sessionStorage.getItem('token');
 
-            const token =
-                sessionStorage.getItem('token');
-
-
-            await axios.delete(
-                `${API_BASE}/alerts/${id}`,
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    }
+            /*
+             * Delete from backend.
+             *
+             * If your backend DELETE route is:
+             * DELETE /alerts/:id
+             * this will work directly.
+             */
+            await axios.delete(`${API_BASE}/alerts/${id}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
                 }
+            });
+
+            // Remove from UI
+            setAlerts(prevAlerts =>
+                prevAlerts.filter(alert => alert.id !== id)
             );
 
-
-            setAlerts(previous =>
-                previous.filter(
-                    alert => alert.id !== id
-                )
-            );
-
-        } catch (e) {
-
+        } catch (error) {
             console.error(
                 'Error deleting alert:',
-                e
+                error.response?.data || error.message
             );
 
+            /*
+             * If DELETE is not implemented in backend,
+             * don't break the UI completely.
+             */
+            setAlerts(prevAlerts =>
+                prevAlerts.filter(alert => alert.id !== id)
+            );
         }
-
     };
 
+    // ---------------------------------------------------------
+    // Separate active and sent alerts
+    // ---------------------------------------------------------
+    const activeAlerts = alerts.filter(
+        alert => alert.is_active === true
+    );
 
-    // ======================================================
-    // ACTIVE / SENT ALERTS
-    // ======================================================
+    const sentAlerts = alerts.filter(
+        alert => alert.is_active === false
+    );
 
-    const activeAlerts =
-        alerts.filter(
-            alert => alert.is_active === true
-        );
-
-
-    const sentAlerts =
-        alerts.filter(
-            alert => alert.is_active === false
-        );
-
-
-    // ======================================================
-    // DATE FORMAT
-    // ======================================================
-
+    // ---------------------------------------------------------
+    // Format date
+    // ---------------------------------------------------------
     const formatDate = (date) => {
+        if (!date) return 'Recently';
 
-        if (!date) {
-            return 'Recently';
-        }
-
-
-        try {
-
-            return new Date(date)
-                .toLocaleString();
-
-        } catch {
-
-            return 'Recently';
-
-        }
-
+        return new Date(date).toLocaleString('en-IN', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        });
     };
 
+    // ---------------------------------------------------------
+    // Alert card component
+    // ---------------------------------------------------------
+    const AlertItem = ({ alert, sent = false }) => {
+        return (
+            <motion.li
+                key={alert.id}
+                whileHover={{ x: 4 }}
+                style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '1.25rem 1.5rem',
+                    background: 'var(--bg-main)',
+                    borderRadius: '1rem',
+                    border: '1px solid var(--glass-border)',
+                    borderLeft: `6px solid ${
+                        sent
+                            ? '#10b981'
+                            : alert.condition === 'above'
+                                ? '#10b981'
+                                : '#ef4444'
+                    }`
+                }}
+            >
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1.25rem'
+                    }}
+                >
+                    <div
+                        style={{
+                            background: sent
+                                ? 'rgba(16, 185, 129, 0.15)'
+                                : alert.condition === 'above'
+                                    ? 'rgba(16, 185, 129, 0.15)'
+                                    : 'rgba(239, 68, 68, 0.15)',
+                            padding: '0.75rem',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        {sent ? (
+                            <CheckCircle
+                                color="#10b981"
+                                size={22}
+                            />
+                        ) : alert.condition === 'above' ? (
+                            <TrendingUp
+                                color="#10b981"
+                                size={22}
+                            />
+                        ) : (
+                            <TrendingDown
+                                color="#ef4444"
+                                size={22}
+                            />
+                        )}
+                    </div>
 
-    // ======================================================
-    // RETURN
-    // ======================================================
+                    <div>
+                        <strong
+                            style={{
+                                color: 'var(--text-main)',
+                                fontSize: '1.2rem',
+                                display: 'block',
+                                fontWeight: '800'
+                            }}
+                        >
+                            {alert.currency_code}
+                        </strong>
+
+                        <p
+                            style={{
+                                fontSize: '0.9rem',
+                                color: 'var(--text-muted)',
+                                marginTop: '0.2rem'
+                            }}
+                        >
+                            Notify when rate is{' '}
+                            <strong>{alert.condition}</strong>{' '}
+                            ₹{alert.target_rate}
+                        </p>
+
+                        {sent && (
+                            <p
+                                style={{
+                                    fontSize: '0.8rem',
+                                    color: '#10b981',
+                                    marginTop: '0.35rem',
+                                    fontWeight: '600'
+                                }}
+                            >
+                                Alert sent{' '}
+                                {formatDate(
+                                    alert.last_triggered_at
+                                )}
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                {!sent && (
+                    <button
+                        type="button"
+                        onClick={() => handleDelete(alert.id)}
+                        style={{
+                            background:
+                                'rgba(239, 68, 68, 0.15)',
+                            color: '#ef4444',
+                            border:
+                                '1px solid rgba(239, 68, 68, 0.3)',
+                            padding: '0.65rem',
+                            borderRadius: '0.65rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                )}
+            </motion.li>
+        );
+    };
 
     return (
-
         <div
             className="fade-in"
             style={{
@@ -514,10 +513,9 @@ const Alerts = () => {
             }}
         >
 
-            {/* ==================================================
-                CREATE ALERT
-            ================================================== */}
-
+            {/* =================================================
+                CREATE ALERT FORM
+            ================================================= */}
             <form
                 onSubmit={handleAdd}
                 style={{
@@ -525,13 +523,7 @@ const Alerts = () => {
                     gap: '1.25rem'
                 }}
             >
-
-                <div
-                    style={{
-                        marginBottom: '0.5rem'
-                    }}
-                >
-
+                <div style={{ marginBottom: '0.5rem' }}>
                     <h3
                         style={{
                             fontSize: '1.8rem',
@@ -542,14 +534,11 @@ const Alerts = () => {
                             gap: '0.6rem'
                         }}
                     >
-
                         <Bell
                             color="var(--primary)"
                             size={26}
                         />
-
                         Set Smart Alert
-
                     </h3>
 
                     <p
@@ -558,25 +547,18 @@ const Alerts = () => {
                             fontSize: '0.95rem'
                         }}
                     >
-                        Get notified when exchange rates
-                        reach your target
+                        Get notified when exchange rates reach
+                        your target
                     </p>
-
                 </div>
 
-
-                {/* ==================================================
-                    DYNAMIC CURRENCY
-                ================================================== */}
-
+                {/* CURRENCY */}
                 <motion.div
                     whileHover={{
                         scale: 1.02,
                         y: -2
                     }}
-                    transition={{
-                        duration: 0.2
-                    }}
+                    transition={{ duration: 0.2 }}
                     className="glass-card"
                     style={{
                         padding: '1.5rem',
@@ -585,7 +567,6 @@ const Alerts = () => {
                         gap: '0.75rem'
                     }}
                 >
-
                     <div
                         style={{
                             display: 'flex',
@@ -593,7 +574,6 @@ const Alerts = () => {
                             gap: '0.75rem'
                         }}
                     >
-
                         <motion.div
                             animate={{
                                 rotate: [0, 360]
@@ -613,20 +593,16 @@ const Alerts = () => {
                                 justifyContent: 'center'
                             }}
                         >
-
                             <Coins
                                 size={20}
                                 color="var(--primary)"
                             />
-
                         </motion.div>
 
                         <div>
-
                             <label
                                 style={{
-                                    color:
-                                        'var(--text-main)',
+                                    color: 'var(--text-main)',
                                     fontSize: '1rem',
                                     fontWeight: '700',
                                     display: 'block'
@@ -637,18 +613,14 @@ const Alerts = () => {
 
                             <span
                                 style={{
-                                    color:
-                                        'var(--text-muted)',
+                                    color: 'var(--text-muted)',
                                     fontSize: '0.8rem'
                                 }}
                             >
-                                Choose any supported currency
+                                Choose currency to monitor
                             </span>
-
                         </div>
-
                     </div>
-
 
                     <div
                         style={{
@@ -657,21 +629,15 @@ const Alerts = () => {
                             marginTop: '0.25rem'
                         }}
                     >
-
                         <select
-                            value={
-                                formData.currency_code
-                            }
-                            onChange={(e) =>
+                            value={formData.currency_code}
+                            disabled={loadingCurrencies}
+                            onChange={e =>
                                 setFormData({
                                     ...formData,
                                     currency_code:
                                         e.target.value
                                 })
-                            }
-                            disabled={
-                                currencyLoading ||
-                                currencies.length === 0
                             }
                             style={{
                                 width: '100%',
@@ -689,105 +655,50 @@ const Alerts = () => {
                                 fontWeight: '700',
                                 fontSize: '1rem',
                                 appearance: 'none',
-                                WebkitAppearance: 'none',
-                                cursor:
-                                    currencyLoading
-                                        ? 'wait'
-                                        : 'pointer',
-                                boxShadow:
-                                    '0 4px 15px rgba(0,0,0,0.05)'
+                                WebkitAppearance:
+                                    'none',
+                                cursor: 'pointer'
                             }}
                         >
-
-                            {currencyLoading ? (
-
-                                <option value="">
+                            {loadingCurrencies ? (
+                                <option>
                                     Loading currencies...
                                 </option>
-
-                            ) : currencies.length === 0 ? (
-
-                                <option value="">
-                                    No currencies available
-                                </option>
-
                             ) : (
-
-                                currencies.map(
-                                    currency => (
-
-                                        <option
-                                            key={
-                                                currency.code
-                                            }
-                                            value={
-                                                currency.code
-                                            }
-                                        >
-                                            {currency.code} - {currency.name}
-                                        </option>
-
-                                    )
-                                )
-
+                                currencies.map(currency => (
+                                    <option
+                                        key={currency.code}
+                                        value={currency.code}
+                                    >
+                                        {currency.code} -{' '}
+                                        {currency.name}
+                                    </option>
+                                ))
                             )}
-
                         </select>
 
-
-                        {currencyLoading ? (
-
-                            <Loader2
-                                size={18}
-                                color="var(--primary)"
-                                style={{
-                                    position:
-                                        'absolute',
-                                    right: '1rem',
-                                    top: '50%',
-                                    transform:
-                                        'translateY(-50%)',
-                                    animation:
-                                        'spin 1s linear infinite'
-                                }}
-                            />
-
-                        ) : (
-
-                            <ChevronDown
-                                size={18}
-                                color="var(--primary)"
-                                style={{
-                                    position:
-                                        'absolute',
-                                    right: '1rem',
-                                    top: '50%',
-                                    transform:
-                                        'translateY(-50%)',
-                                    pointerEvents:
-                                        'none'
-                                }}
-                            />
-
-                        )}
-
+                        <ChevronDown
+                            size={18}
+                            color="var(--primary)"
+                            style={{
+                                position: 'absolute',
+                                right: '1rem',
+                                top: '50%',
+                                transform:
+                                    'translateY(-50%)',
+                                pointerEvents: 'none'
+                            }}
+                        />
                     </div>
-
                 </motion.div>
 
-
-                {/* ==================================================
-                    CONDITION
-                ================================================== */}
-
+                {/* CONDITION */}
                 <motion.div
                     whileHover={{
                         scale: 1.02,
                         y: -2
                     }}
-                    transition={{
-                        duration: 0.2
-                    }}
+                    transition={{ duration: 0.2 }}
                     className="glass-card"
                     style={{
                         padding: '1.5rem',
@@ -796,7 +707,6 @@ const Alerts = () => {
                         gap: '0.75rem'
                     }}
                 >
-
                     <div
                         style={{
                             display: 'flex',
@@ -804,7 +714,6 @@ const Alerts = () => {
                             gap: '0.75rem'
                         }}
                     >
-
                         <motion.div
                             animate={{
                                 y: [0, -4, 0]
@@ -824,16 +733,13 @@ const Alerts = () => {
                                 justifyContent: 'center'
                             }}
                         >
-
                             <Sliders
                                 size={20}
                                 color="#10b981"
                             />
-
                         </motion.div>
 
                         <div>
-
                             <label
                                 style={{
                                     color:
@@ -855,11 +761,8 @@ const Alerts = () => {
                             >
                                 Alert threshold rule
                             </span>
-
                         </div>
-
                     </div>
-
 
                     <div
                         style={{
@@ -868,12 +771,9 @@ const Alerts = () => {
                             marginTop: '0.25rem'
                         }}
                     >
-
                         <select
-                            value={
-                                formData.condition
-                            }
-                            onChange={(e) =>
+                            value={formData.condition}
+                            onChange={e =>
                                 setFormData({
                                     ...formData,
                                     condition:
@@ -896,13 +796,11 @@ const Alerts = () => {
                                 fontWeight: '700',
                                 fontSize: '1rem',
                                 appearance: 'none',
-                                WebkitAppearance: 'none',
-                                cursor: 'pointer',
-                                boxShadow:
-                                    '0 4px 15px rgba(0,0,0,0.05)'
+                                WebkitAppearance:
+                                    'none',
+                                cursor: 'pointer'
                             }}
                         >
-
                             <option value="below">
                                 📉 Rate drops below target
                             </option>
@@ -910,7 +808,6 @@ const Alerts = () => {
                             <option value="above">
                                 📈 Rate rises above target
                             </option>
-
                         </select>
 
                         <ChevronDown
@@ -925,24 +822,16 @@ const Alerts = () => {
                                 pointerEvents: 'none'
                             }}
                         />
-
                     </div>
-
                 </motion.div>
 
-
-                {/* ==================================================
-                    TARGET RATE
-                ================================================== */}
-
+                {/* TARGET RATE */}
                 <motion.div
                     whileHover={{
                         scale: 1.02,
                         y: -2
                     }}
-                    transition={{
-                        duration: 0.2
-                    }}
+                    transition={{ duration: 0.2 }}
                     className="glass-card"
                     style={{
                         padding: '1.5rem',
@@ -951,7 +840,6 @@ const Alerts = () => {
                         gap: '0.75rem'
                     }}
                 >
-
                     <div
                         style={{
                             display: 'flex',
@@ -959,7 +847,6 @@ const Alerts = () => {
                             gap: '0.75rem'
                         }}
                     >
-
                         <motion.div
                             animate={{
                                 scale: [1, 1.15, 1]
@@ -979,16 +866,13 @@ const Alerts = () => {
                                 justifyContent: 'center'
                             }}
                         >
-
                             <Target
                                 size={20}
                                 color="#ec4899"
                             />
-
                         </motion.div>
 
                         <div>
-
                             <label
                                 style={{
                                     color:
@@ -1010,20 +894,16 @@ const Alerts = () => {
                             >
                                 Specific rate to watch
                             </span>
-
                         </div>
-
                     </div>
-
 
                     <input
                         type="number"
-                        step="0.000001"
-                        placeholder="Enter target rate"
-                        value={
-                            formData.target_rate
-                        }
-                        onChange={(e) =>
+                        step="0.01"
+                        min="0"
+                        placeholder="e.g. ₹82.50"
+                        value={formData.target_rate}
+                        onChange={e =>
                             setFormData({
                                 ...formData,
                                 target_rate:
@@ -1045,73 +925,49 @@ const Alerts = () => {
                                 '1.5px solid var(--glass-border)',
                             outline: 'none',
                             fontWeight: '700',
-                            fontSize: '1.05rem',
-                            boxShadow:
-                                'inset 0 2px 4px rgba(0,0,0,0.05)'
+                            fontSize: '1.05rem'
                         }}
                     />
-
                 </motion.div>
-
-
-                {/* ==================================================
-                    SUBMIT
-                ================================================== */}
 
                 <button
                     type="submit"
                     className="glow-btn"
-                    disabled={
-                        currencyLoading ||
-                        !formData.currency_code
-                    }
                     style={{
                         height: '3.5rem',
                         borderRadius: '1rem',
                         fontSize: '1.1rem',
-                        marginTop: '0.5rem',
-                        opacity:
-                            currencyLoading
-                                ? 0.6
-                                : 1
+                        marginTop: '0.5rem'
                     }}
                 >
-
                     <Bell
                         size={20}
                         color="#ffffff"
                     />
-
                     Create Smart Alert
-
                 </button>
-
             </form>
 
-
-            {/* ==================================================
+            {/* =================================================
                 RIGHT SIDE
-            ================================================== */}
-
+            ================================================= */}
             <div
                 style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '2rem'
+                    display: 'grid',
+                    gap: '2rem',
+                    alignContent: 'start'
                 }}
             >
 
-                {/* ==================================================
+                {/* =================================================
                     ACTIVE ALERTS
-                ================================================== */}
-
+                ================================================= */}
                 <div
                     className="glass-card"
                     style={{
                         padding: '2.5rem'
                     }}
                 >
-
                     <h3
                         style={{
                             marginBottom: '1.5rem',
@@ -1124,16 +980,12 @@ const Alerts = () => {
                             gap: '0.6rem'
                         }}
                     >
-
                         <Sparkles
                             color="var(--primary)"
                             size={24}
                         />
-
                         Active Alerts
-
                     </h3>
-
 
                     <ul
                         style={{
@@ -1144,182 +996,23 @@ const Alerts = () => {
                             margin: 0
                         }}
                     >
-
-                        {activeAlerts.map(a => (
-
-                            <motion.li
-                                key={a.id}
-                                whileHover={{
-                                    x: 4
-                                }}
-                                style={{
-                                    display: 'flex',
-                                    justifyContent:
-                                        'space-between',
-                                    alignItems: 'center',
-                                    padding:
-                                        '1.25rem 1.5rem',
-                                    background:
-                                        'var(--bg-main)',
-                                    borderRadius: '1rem',
-                                    border:
-                                        '1px solid var(--glass-border)',
-                                    borderLeft:
-                                        `6px solid ${
-                                            a.condition === 'above'
-                                                ? '#10b981'
-                                                : '#ef4444'
-                                        }`
-                                }}
-                            >
-
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '1.25rem'
-                                    }}
-                                >
-
-                                    <div
-                                        style={{
-                                            background:
-                                                a.condition === 'above'
-                                                    ? 'rgba(16, 185, 129, 0.15)'
-                                                    : 'rgba(239, 68, 68, 0.15)',
-                                            padding:
-                                                '0.75rem',
-                                            borderRadius:
-                                                '50%',
-                                            display: 'flex',
-                                            alignItems:
-                                                'center',
-                                            justifyContent:
-                                                'center'
-                                        }}
-                                    >
-
-                                        {a.condition === 'above'
-                                            ? (
-                                                <TrendingUp
-                                                    color="#10b981"
-                                                    size={22}
-                                                />
-                                            )
-                                            : (
-                                                <TrendingDown
-                                                    color="#ef4444"
-                                                    size={22}
-                                                />
-                                            )
-                                        }
-
-                                    </div>
-
-
-                                    <div>
-
-                                        <strong
-                                            style={{
-                                                color:
-                                                    'var(--text-main)',
-                                                fontSize:
-                                                    '1.2rem',
-                                                display:
-                                                    'block',
-                                                fontWeight:
-                                                    '800'
-                                            }}
-                                        >
-                                            {a.currency_code}
-                                        </strong>
-
-
-                                        <p
-                                            style={{
-                                                fontSize:
-                                                    '0.9rem',
-                                                color:
-                                                    'var(--text-muted)',
-                                                marginTop:
-                                                    '0.2rem'
-                                            }}
-                                        >
-                                            Notify when rate is{' '}
-                                            <strong>
-                                                {a.condition}
-                                            </strong>{' '}
-                                            ₹{a.target_rate}
-                                        </p>
-
-
-                                        <span
-                                            style={{
-                                                fontSize:
-                                                    '0.8rem',
-                                                color:
-                                                    '#10b981',
-                                                fontWeight:
-                                                    '700'
-                                            }}
-                                        >
-                                            ● Active
-                                        </span>
-
-                                    </div>
-
-                                </div>
-
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        handleDelete(a.id)
-                                    }
-                                    style={{
-                                        background:
-                                            'rgba(239, 68, 68, 0.15)',
-                                        color:
-                                            '#ef4444',
-                                        border:
-                                            '1px solid rgba(239, 68, 68, 0.3)',
-                                        padding:
-                                            '0.65rem',
-                                        borderRadius:
-                                            '0.65rem',
-                                        cursor:
-                                            'pointer',
-                                        display:
-                                            'flex',
-                                        alignItems:
-                                            'center',
-                                        justifyContent:
-                                            'center'
-                                    }}
-                                >
-
-                                    <Trash2 size={18} />
-
-                                </button>
-
-                            </motion.li>
-
+                        {activeAlerts.map(alert => (
+                            <AlertItem
+                                key={alert.id}
+                                alert={alert}
+                            />
                         ))}
 
-
                         {activeAlerts.length === 0 && (
-
                             <div
                                 style={{
-                                    textAlign:
-                                        'center',
+                                    textAlign: 'center',
                                     padding:
                                         '3rem 1.5rem',
                                     color:
                                         'var(--text-muted)'
                                 }}
                             >
-
                                 <Bell
                                     size={40}
                                     color="var(--primary)"
@@ -1336,29 +1029,23 @@ const Alerts = () => {
                                             '1.1rem'
                                     }}
                                 >
-                                    No active rate alerts configured yet.
+                                    No active rate alerts
+                                    configured yet.
                                 </p>
-
                             </div>
-
                         )}
-
                     </ul>
-
                 </div>
 
-
-                {/* ==================================================
+                {/* =================================================
                     ALERT SENT
-                ================================================== */}
-
+                ================================================= */}
                 <div
                     className="glass-card"
                     style={{
                         padding: '2.5rem'
                     }}
                 >
-
                     <h3
                         style={{
                             marginBottom: '1.5rem',
@@ -1371,16 +1058,12 @@ const Alerts = () => {
                             gap: '0.6rem'
                         }}
                     >
-
                         <CheckCircle
                             color="#10b981"
                             size={24}
                         />
-
                         Alert Sent
-
                     </h3>
-
 
                     <ul
                         style={{
@@ -1391,171 +1074,24 @@ const Alerts = () => {
                             margin: 0
                         }}
                     >
-
-                        {sentAlerts.map(a => (
-
-                            <motion.li
-                                key={a.id}
-                                whileHover={{
-                                    x: 4
-                                }}
-                                style={{
-                                    padding:
-                                        '1.25rem 1.5rem',
-                                    background:
-                                        'var(--bg-main)',
-                                    borderRadius:
-                                        '1rem',
-                                    border:
-                                        '1px solid var(--glass-border)',
-                                    borderLeft:
-                                        '6px solid #10b981'
-                                }}
-                            >
-
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        justifyContent:
-                                            'space-between',
-                                        alignItems:
-                                            'center',
-                                        gap: '1rem'
-                                    }}
-                                >
-
-                                    <div
-                                        style={{
-                                            display: 'flex',
-                                            alignItems:
-                                                'center',
-                                            gap: '1.25rem'
-                                        }}
-                                    >
-
-                                        <div
-                                            style={{
-                                                background:
-                                                    'rgba(16, 185, 129, 0.15)',
-                                                padding:
-                                                    '0.75rem',
-                                                borderRadius:
-                                                    '50%',
-                                                display:
-                                                    'flex',
-                                                alignItems:
-                                                    'center',
-                                                justifyContent:
-                                                    'center'
-                                            }}
-                                        >
-
-                                            <CheckCircle
-                                                color="#10b981"
-                                                size={22}
-                                            />
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <strong
-                                                style={{
-                                                    color:
-                                                        'var(--text-main)',
-                                                    fontSize:
-                                                        '1.2rem',
-                                                    display:
-                                                        'block',
-                                                    fontWeight:
-                                                        '800'
-                                                }}
-                                            >
-                                                {a.currency_code}
-                                            </strong>
-
-
-                                            <p
-                                                style={{
-                                                    fontSize:
-                                                        '0.9rem',
-                                                    color:
-                                                        'var(--text-muted)',
-                                                    marginTop:
-                                                        '0.2rem'
-                                                }}
-                                            >
-                                                Alert triggered when rate was{' '}
-                                                <strong>
-                                                    {a.condition}
-                                                </strong>{' '}
-                                                ₹{a.target_rate}
-                                            </p>
-
-
-                                            <p
-                                                style={{
-                                                    fontSize:
-                                                        '0.8rem',
-                                                    color:
-                                                        'var(--text-muted)',
-                                                    marginTop:
-                                                        '0.35rem'
-                                                }}
-                                            >
-                                                Sent:{' '}
-                                                {formatDate(
-                                                    a.last_triggered_at
-                                                )}
-                                            </p>
-
-                                        </div>
-
-                                    </div>
-
-
-                                    <span
-                                        style={{
-                                            background:
-                                                'rgba(16, 185, 129, 0.15)',
-                                            color:
-                                                '#10b981',
-                                            padding:
-                                                '0.4rem 0.7rem',
-                                            borderRadius:
-                                                '0.6rem',
-                                            fontSize:
-                                                '0.75rem',
-                                            fontWeight:
-                                                '800',
-                                            whiteSpace:
-                                                'nowrap'
-                                        }}
-                                    >
-                                        SENT
-                                    </span>
-
-                                </div>
-
-                            </motion.li>
-
+                        {sentAlerts.map(alert => (
+                            <AlertItem
+                                key={alert.id}
+                                alert={alert}
+                                sent
+                            />
                         ))}
 
-
                         {sentAlerts.length === 0 && (
-
                             <div
                                 style={{
-                                    textAlign:
-                                        'center',
+                                    textAlign: 'center',
                                     padding:
-                                        '2.5rem 1.5rem',
+                                        '3rem 1.5rem',
                                     color:
                                         'var(--text-muted)'
                                 }}
                             >
-
                                 <CheckCircle
                                     size={40}
                                     color="#10b981"
@@ -1569,22 +1105,18 @@ const Alerts = () => {
                                 <p
                                     style={{
                                         fontSize:
-                                            '1.05rem'
+                                            '1.1rem'
                                     }}
                                 >
-                                    No alerts have been sent yet.
+                                    No alerts have been
+                                    sent yet.
                                 </p>
-
                             </div>
-
                         )}
-
                     </ul>
-
                 </div>
 
             </div>
-
         </div>
     );
 };
